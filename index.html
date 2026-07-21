@@ -61,6 +61,7 @@
       <div class="nav-link active" onclick="showPage('home')">🏠 Home</div>
       <div class="nav-link" onclick="showPage('products')">📦 Products</div>
       <div class="nav-link" onclick="showPage('orders')">📋 My Orders</div>
+      <div class="nav-link" onclick="openDevModal()">👨‍💻 Developer</div>
       <div class="nav-link u-hidden" id="adminNavLink" onclick="showPage('admin')">🛡 Admin</div>
     </div>
   </header>
@@ -187,8 +188,20 @@
   </div>
   <!-- FOOTER -->
   <footer class="app-footer">
-    <div class="footer-content">
-      Developed by <a href="https://github.com/rajeshsoyeda-hash" target="_blank" rel="noopener noreferrer">Rajesh Soyeda</a>
+    <div class="footer-card">
+      <div class="footer-dev-row" onclick="openDevModal()">
+        <div class="footer-dev-avatar">R</div>
+        <div>
+          <div class="footer-dev-title">Designed & Developed by <span class="highlight">Rajesh Soyeda</span></div>
+          <div class="footer-dev-sub">Full-Stack Software Engineer · Bhopal, MP</div>
+        </div>
+      </div>
+      <div class="footer-actions-row">
+        <a href="https://github.com/rajeshsoyeda-hash" target="_blank" rel="noopener noreferrer" class="footer-link">🐙 GitHub</a>
+        <a href="https://github.com/rajeshsoyeda-hash/E-eCommerce-.git" target="_blank" rel="noopener noreferrer" class="footer-link">💻 Source Code</a>
+        <a href="https://rajeshsoyeda-hash.github.io/E-eCommerce-/" target="_blank" rel="noopener noreferrer" class="footer-link">🌐 Live Demo</a>
+        <button class="footer-btn" onclick="openDevModal()">👨‍💻 Developer Info</button>
+      </div>
     </div>
   </footer>
 </div>
@@ -198,6 +211,38 @@
   <div class="cart-header"><div class="cart-title">🛒 Cart (<span id="cartItemCount">0</span>)</div><button class="cart-close" onclick="toggleCart()">✕</button></div>
   <div class="cart-body" id="cartBody"></div>
   <div class="cart-footer" id="cartFooter"></div>
+</div>
+<!-- DEVELOPER MODAL -->
+<div class="modal-overlay" id="devModal" onclick="closeModalOutside(event,'devModal')">
+  <div class="modal dev-modal">
+    <div class="modal-header">
+      <div class="modal-title">👨‍💻 Developer Profile</div>
+      <button class="modal-close" onclick="closeModal('devModal')">✕</button>
+    </div>
+    <div class="dev-profile-body">
+      <div class="dev-avatar-hero">
+        <div class="dev-avatar">R</div>
+        <div class="dev-hero-info">
+          <h2 class="dev-name">Rajesh Soyeda</h2>
+          <div class="dev-role">Full-Stack Software Engineer</div>
+          <div class="dev-location">📍 Bhopal, Madhya Pradesh, India</div>
+        </div>
+      </div>
+
+      <div class="spec-grid">
+        <div class="spec-item"><div class="spec-label">Project Name</div><div class="spec-value">ShopSphere E-Commerce</div></div>
+        <div class="spec-item"><div class="spec-label">Architecture</div><div class="spec-value">Modular SPA (HTML5/CSS3/JS)</div></div>
+        <div class="spec-item"><div class="spec-label">Design Aesthetics</div><div class="spec-value">Midnight Slate Glassmorphism</div></div>
+        <div class="spec-item"><div class="spec-label">State Engine</div><div class="spec-value">LocalStorage Sync Pipeline</div></div>
+      </div>
+
+      <div class="dev-actions-grid">
+        <a href="https://github.com/rajeshsoyeda-hash" target="_blank" rel="noopener noreferrer" class="btn-primary">🐙 GitHub Profile</a>
+        <a href="https://github.com/rajeshsoyeda-hash/E-eCommerce-.git" target="_blank" rel="noopener noreferrer" class="btn-outline">💻 Source Code</a>
+        <a href="https://rajeshsoyeda-hash.github.io/E-eCommerce-/" target="_blank" rel="noopener noreferrer" class="btn-outline">🌐 Live Web App</a>
+      </div>
+    </div>
+  </div>
 </div>
 <!-- QUICK VIEW PRODUCT MODAL -->
 <div class="modal-overlay" id="quickViewModal" onclick="closeModalOutside(event,'quickViewModal')">

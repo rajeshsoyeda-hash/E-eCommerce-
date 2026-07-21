@@ -573,7 +573,10 @@ function saveProduct(){
 }
 function deleteProduct(id){DB.save('products',DB.products().filter(p=>p.id!==id));renderAdmin();showToast('Product deleted.','error');}
 
-// UI
+function openDevModal(){
+  openModal('devModal');
+}
+
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function closeModalOutside(e,id){if(e.target.id===id)closeModal(id);}
 function showToast(msg,type='success'){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;document.getElementById('toastIcon').textContent=type==='success'?'✓':type==='error'?'✕':'ℹ';t.className='toast '+type+' show';setTimeout(()=>t.classList.remove('show'),3000);}
