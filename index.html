@@ -88,7 +88,22 @@
   <div class="page" id="page-products">
     <div class="section-header" style="margin-bottom:1rem">
       <div class="section-title">All Products</div>
-      <div style="font-size:.875rem;color:var(--muted)" id="productCount"></div>
+      <div style="font-size:.875rem;color:var(--text-muted)" id="productCount"></div>
+    </div>
+    <div class="filter-controls-bar">
+      <div class="filter-group">
+        <label class="filter-label">Max Price: <span id="priceValue" class="price-val">₹2,00,000</span></label>
+        <input type="range" class="price-slider" id="priceRange" min="0" max="200000" step="500" value="200000" oninput="handlePriceSlider(this.value)">
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Sort By</label>
+        <select class="filter-select" id="sortSelect" onchange="handleSortChange(this.value)">
+          <option value="featured">🔥 Featured</option>
+          <option value="price-low">💰 Price: Low to High</option>
+          <option value="price-high">💎 Price: High to Low</option>
+          <option value="rating">⭐ Rating: High to Low</option>
+        </select>
+      </div>
     </div>
     <div class="categories-row" id="categoriesRow"></div>
     <div class="product-grid" id="allProductsGrid"></div>

@@ -1,4 +1,4 @@
-let currentUser=null,currentPage='home',selCat='All',selProduct=null,detailQty=1,adminTab='products',editProdId=null;
+let currentUser=null,currentPage='home',selCat='All',selProduct=null,detailQty=1,adminTab='products',editProdId=null,maxPrice=200000,sortBy='featured';
 
 // AUTH
 function switchAuthTab(tab){
@@ -91,17 +91,45 @@ function renderCategories(){
   const cats=['All',...new Set(DB.products().map(p=>p.category))];
   document.getElementById('categoriesRow').innerHTML=cats.map(c=>`<div class="cat-pill ${c===selCat?'active':''}" onclick="filterByCategory('${c}')">${CAT_EMOJI[c]||''} ${c}</div>`).join('');
 }
-function filterByCategory(cat){selCat=cat;renderCategories();renderAllProducts();}
+function handlePriceSlider(val){
+  maxPrice=parseFloat(val)||200000;
+  const el=document.getElementById('priceValue');
+  if(el) el.textContent='₹'+maxPrice.toLocaleString('en-IN');
+  renderAllProducts();
+}
+function handleSortChange(val){
+  sortBy=val;
+  renderAllProducts();
+}
 function renderAllProducts(){
   renderSkeletons('allProductsGrid', 8);
   setTimeout(()=>{
     let prods=DB.products();
-    if(selCat!=='All')prods=prods.filter(p=>p.category===selCat);
-    const q=document.getElementById('searchInput').value.toLowerCase();
-    if(q)prods=prods.filter(p=>p.name.toLowerCase().includes(q)||p.category.toLowerCase().includes(q));
-    document.getElementById('productCount').textContent=prods.length+' products';
-    document.getElementById('allProductsGrid').innerHTML=prods.length?prods.map(productCard).join(''):`<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--muted)"><div style="font-size:3rem;margin-bottom:1rem">🔍</div><div style="font-weight:700">No products found</div></div>`;
-  }, 200);
+    if(selCat!=='All') prods=prods.filter(p=>p.category===selCat);
+    
+    // Price Range Filter
+    prods=prods.filter(p=>p.price <= maxPrice);
+
+    // Full-Text Search (Name, Category, Description, Badge)
+    const q=document.getElementById('searchInput').value.toLowerCase().trim();
+    if(q){
+      prods=prods.filter(p=>
+        p.name.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q) ||
+        (p.desc && p.desc.toLowerCase().includes(q)) ||
+        (p.badge && p.badge.toLowerCase().includes(q))
+      );
+    }
+
+    // Sorting Pipeline
+    if(sortBy === 'price-low') prods.sort((a,b) => a.price - b.price);
+    else if(sortBy === 'price-high') prods.sort((a,b) => b.price - a.price);
+    else if(sortBy === 'rating') prods.sort((a,b) => (b.rating||0) - (a.rating||0));
+
+    const totalCount=DB.products().length;
+    document.getElementById('productCount').textContent=`Showing ${prods.length} of ${totalCount} products`;
+    document.getElementById('allProductsGrid').innerHTML=prods.length ? prods.map(productCard).join('') : `<div style="grid-column:1/-1;text-align:center;padding:3.5rem;color:var(--text-muted)"><div style="font-size:3.5rem;margin-bottom:1rem">🔍</div><div style="font-size:1.1rem;font-weight:700;color:var(--text)">No matching products found</div><div style="font-size:0.85rem;margin-top:4px;color:var(--text-dim)">Try adjusting your price slider or search keywords.</div></div>`;
+  }, 120);
 }
 function handleSearch(){if(currentPage==='products')renderAllProducts();else showPage('products');}
 function toggleWishlist(el){el.classList.toggle('active');showToast(el.classList.contains('active')?'Added to wishlist ❤️':'Removed from wishlist','info');}
