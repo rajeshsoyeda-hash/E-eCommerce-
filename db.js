@@ -3,6 +3,8 @@ const DB={
   products:()=>JSON.parse(localStorage.getItem('ss_products')||'[]'),
   orders:()=>JSON.parse(localStorage.getItem('ss_orders')||'[]'),
   cart:()=>JSON.parse(localStorage.getItem('ss_cart')||'[]'),
+  wishlist:()=>JSON.parse(localStorage.getItem('ss_wishlist')||'[]'),
+  promo:()=>JSON.parse(localStorage.getItem('ss_promo')||'null'),
   session:()=>JSON.parse(localStorage.getItem('ss_session')||'null'),
   save:(k,d)=>localStorage.setItem('ss_'+k,JSON.stringify(d))
 };

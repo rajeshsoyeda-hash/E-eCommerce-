@@ -66,10 +66,11 @@ function renderSkeletons(containerId, count=8){
 // PRODUCTS
 function productCard(p){
   const cat=CAT_COLORS[p.category]||{bg:'#f3f4f6',color:'#555'};
+  const isWish=DB.wishlist().includes(p.id);
   return`<div class="product-card" onclick="openDetail(${p.id})">
     <div class="product-img" style="background:${cat.bg}">
       ${p.badge?`<div class="product-badge" style="${BADGE_STYLES[p.badge]||''}">${p.badge}</div>`:''}
-      <div class="product-wishlist" onclick="event.stopPropagation();toggleWishlist(this)">❤️</div>
+      <div class="product-wishlist ${isWish?'active':''}" onclick="event.stopPropagation();toggleWishlist(${p.id})">${isWish?'💖':'❤️'}</div>
       <span>${p.emoji||'📦'}</span>
     </div>
     <div class="product-body">
@@ -132,7 +133,49 @@ function renderAllProducts(){
   }, 120);
 }
 function handleSearch(){if(currentPage==='products')renderAllProducts();else showPage('products');}
-function toggleWishlist(el){el.classList.toggle('active');showToast(el.classList.contains('active')?'Added to wishlist ❤️':'Removed from wishlist','info');}
+
+// WISHLIST PERSISTENCE
+function toggleWishlist(id){
+  let list=DB.wishlist();
+  const idx=list.indexOf(id);
+  let added=false;
+  if(idx>=0){ list.splice(idx,1); }
+  else{ list.push(id); added=true; }
+  DB.save('wishlist',list);
+  if(currentPage==='products') renderAllProducts();
+  if(currentPage==='home') renderFeatured();
+  showToast(added?'Added to wishlist ❤️':'Removed from wishlist','info');
+}
+
+// PROMO CODES SYSTEM
+const PROMO_CODES={
+  SAVE10:{code:'SAVE10',percent:10},
+  PROMO20:{code:'PROMO20',percent:20},
+  WELCOME50:{code:'WELCOME50',percent:50}
+};
+
+function applyPromoCode(){
+  const input=document.getElementById('promoInput');
+  if(!input)return;
+  const val=input.value.trim().toUpperCase();
+  if(!val){ showToast('Enter a promo code!','error'); return; }
+  if(PROMO_CODES[val]){
+    DB.save('promo',PROMO_CODES[val]);
+    showToast(`Promo code ${val} applied! 🎉`,'success');
+    renderCartSidebar();
+    if(currentPage==='checkout') renderCheckout();
+  }else{
+    showToast('Invalid promo code! Try SAVE10 or PROMO20','error');
+  }
+}
+
+function removePromoCode(){
+  DB.save('promo',null);
+  showToast('Promo code removed','info');
+  renderCartSidebar();
+  if(currentPage==='checkout') renderCheckout();
+}
+
 function openDetail(id){
   const p=DB.products().find(p=>p.id===id);if(!p)return;
   selProduct=p;detailQty=1;
@@ -205,7 +248,11 @@ function toggleCart(){const c=document.getElementById('cartSidebar'),o=document.
 function closeCart(){document.getElementById('cartSidebar').classList.remove('open');document.getElementById('cartOverlay').classList.remove('show');}
 function renderCartSidebar(){
   const cart=DB.cart(),body=document.getElementById('cartBody'),footer=document.getElementById('cartFooter');
-  if(!cart.length){body.innerHTML=`<div class="cart-empty"><div class="cart-empty-icon">🛒</div><div style="font-weight:700;margin-bottom:.5rem">Your cart is empty</div><div style="font-size:.85rem">Add products to get started!</div></div>`;footer.innerHTML='';return;}
+  if(!cart.length){
+    body.innerHTML=`<div class="cart-empty"><div class="cart-empty-icon">🛒</div><div style="font-weight:700;margin-bottom:.5rem">Your cart is empty</div><div style="font-size:.85rem">Add products to get started!</div></div>`;
+    footer.innerHTML='';
+    return;
+  }
   body.innerHTML=cart.map(item=>`
     <div class="cart-item">
       <div class="cart-item-img">${item.emoji||'📦'}</div>
@@ -220,11 +267,30 @@ function renderCartSidebar(){
       </div>
       <div class="remove-btn" onclick="removeFromCart(${item.productId})">✕</div>
     </div>`).join('');
-  const sub=cart.reduce((s,c)=>s+c.price*c.qty,0),del=sub>=499?0:40;
-  footer.innerHTML=`<div class="cart-summary">
+
+  const sub=cart.reduce((s,c)=>s+c.price*c.qty,0);
+  const activePromo=DB.promo();
+  const disc=activePromo ? Math.round(sub*(activePromo.percent/100)) : 0;
+  const del=sub>0 && (sub-disc)<499 ? 40 : 0;
+  const total=Math.max(0, sub - disc + del);
+
+  const promoHtml=activePromo?`
+    <div class="promo-active-tag">
+      <span>🎟 ${activePromo.code} (${activePromo.percent}% OFF)</span>
+      <button class="promo-remove-btn" onclick="removePromoCode()">✕</button>
+    </div>`:
+    `<div class="promo-input-group">
+      <input type="text" id="promoInput" class="promo-input" placeholder="PROMO CODE (e.g. SAVE10)">
+      <button class="promo-apply-btn" onclick="applyPromoCode()">Apply</button>
+    </div>`;
+
+  footer.innerHTML=`
+  <div class="promo-box">${promoHtml}</div>
+  <div class="cart-summary">
     <div class="cart-row"><span>Subtotal</span><span>₹${sub.toLocaleString()}</span></div>
-    <div class="cart-row"><span>Delivery</span><span>${del===0?'<span style="color:var(--green)">FREE</span>':'₹'+del}</span></div>
-    <div class="cart-row total"><span>Total</span><span>₹${(sub+del).toLocaleString()}</span></div>
+    ${disc>0?`<div class="cart-row discount-row"><span>Discount (${activePromo.code})</span><span>−₹${disc.toLocaleString()}</span></div>`:''}
+    <div class="cart-row"><span>Delivery</span><span>${del===0?'<span style="color:var(--emerald)">FREE</span>':'₹'+del}</span></div>
+    <div class="cart-row total"><span>Total</span><span>₹${total.toLocaleString()}</span></div>
   </div>
   <button class="checkout-btn" onclick="closeCart();showPage('checkout')">Proceed to Checkout →</button>`;
 }
@@ -233,19 +299,33 @@ function renderCartSidebar(){
 function renderCheckout(){
   const cart=DB.cart();
   if(!cart.length){showPage('home');showToast('Cart is empty!','error');return;}
-  const sub=cart.reduce((s,c)=>s+c.price*c.qty,0),del=sub>=499?0:40;
+  const sub=cart.reduce((s,c)=>s+c.price*c.qty,0);
+  const activePromo=DB.promo();
+  const disc=activePromo ? Math.round(sub*(activePromo.percent/100)) : 0;
+  const del=sub>0 && (sub-disc)<499 ? 40 : 0;
+  const total=Math.max(0, sub - disc + del);
+
   document.getElementById('checkoutItems').innerHTML=cart.map(i=>`<div class="order-item-row"><div class="order-item-img">${i.emoji||'📦'}</div><div class="order-item-name">${i.name} ×${i.qty}</div><div class="order-item-price">₹${(i.price*i.qty).toLocaleString()}</div></div>`).join('');
-  document.getElementById('checkoutSummary').innerHTML=`<div class="summary-row"><span>Subtotal</span><span>₹${sub.toLocaleString()}</span></div><div class="summary-row"><span>Delivery</span><span>${del===0?'FREE':'₹'+del}</span></div><div class="summary-row total"><span>Total</span><span>₹${(sub+del).toLocaleString()}</span></div>`;
+  document.getElementById('checkoutSummary').innerHTML=`
+    <div class="summary-row"><span>Subtotal</span><span>₹${sub.toLocaleString()}</span></div>
+    ${disc>0?`<div class="summary-row discount-row" style="color:var(--emerald)"><span>Discount (${activePromo.code})</span><span>−₹${disc.toLocaleString()}</span></div>`:''}
+    <div class="summary-row"><span>Delivery</span><span>${del===0?'FREE':'₹'+del}</span></div>
+    <div class="summary-row total"><span>Total</span><span>₹${total.toLocaleString()}</span></div>`;
   document.getElementById('ckName').value=currentUser?.name||'';
 }
 function placeOrder(){
   const name=document.getElementById('ckName').value.trim(),phone=document.getElementById('ckPhone').value.trim(),addr=document.getElementById('ckAddr').value.trim();
   if(!name||!phone||!addr){showToast('Fill all delivery details!','error');return;}
   const cart=DB.cart(),pay=document.querySelector('input[name="payment"]:checked')?.value||'UPI';
-  const sub=cart.reduce((s,c)=>s+c.price*c.qty,0),del=sub>=499?0:40;
+  const sub=cart.reduce((s,c)=>s+c.price*c.qty,0);
+  const activePromo=DB.promo();
+  const disc=activePromo ? Math.round(sub*(activePromo.percent/100)) : 0;
+  const del=sub>0 && (sub-disc)<499 ? 40 : 0;
+  const total=Math.max(0, sub - disc + del);
+
   const oid='ORD-'+Date.now().toString().slice(-6);
-  const order={id:oid,userId:currentUser.id,items:cart.map(c=>({productId:c.productId,name:c.name,qty:c.qty,price:c.price})),total:sub+del,status:'Confirmed',address:addr+', '+document.getElementById('ckCity').value+', '+document.getElementById('ckState').value,payment:pay,date:new Date().toISOString()};
-  const orders=DB.orders();orders.unshift(order);DB.save('orders',orders);DB.save('cart',[]);updateCartBadge();
+  const order={id:oid,userId:currentUser.id,items:cart.map(c=>({productId:c.productId,name:c.name,qty:c.qty,price:c.price})),total,status:'Confirmed',address:addr+', '+document.getElementById('ckCity').value+', '+document.getElementById('ckState').value,payment:pay,date:new Date().toISOString()};
+  const orders=DB.orders();orders.unshift(order);DB.save('orders',orders);DB.save('cart',[]);DB.save('promo',null);updateCartBadge();
   document.getElementById('successOrderId').textContent='Order '+oid;showPage('success');
 }
 function renderOrders(){
