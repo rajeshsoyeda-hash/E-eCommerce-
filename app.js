@@ -41,6 +41,12 @@ function startApp(user){
 
 // ROUTING
 function showPage(page){
+  if((page==='checkout'||page==='orders') && !currentUser){
+    showToast('Please sign in to continue 🔒','info');
+    document.getElementById('authScreen').style.display='flex';
+    document.getElementById('appScreen').style.display='none';
+    return;
+  }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(n=>n.classList.remove('active'));
   currentPage=page;
@@ -51,7 +57,7 @@ function showPage(page){
   if(page==='home')renderFeatured();
   if(page==='products'){selCat='All';renderCategories();renderAllProducts();}
   if(page==='orders')renderOrders();
-  if(page==='admin'){if(currentUser?.role!=='admin'){showToast('Admin only!','error');showPage('home');return;}renderAdmin();}
+  if(page==='admin'){if(currentUser?.role!=='admin'){showToast('Admin access required!','error');showPage('home');return;}renderAdmin();}
   if(page==='checkout')renderCheckout();
   window.scrollTo(0,0);closeCart();
 }
@@ -69,9 +75,10 @@ let selectedColor='Midnight Slate',selectedSize='Standard',currentQvQty=1;
 function productCard(p){
   const cat=CAT_COLORS[p.category]||{bg:'#f3f4f6',color:'#555'};
   const isWish=DB.wishlist().includes(p.id);
+  const isOut=p.stock===0;
   return`<div class="product-card" onclick="openQuickView(${p.id})">
     <div class="product-img" style="background:${cat.bg}">
-      ${p.badge?`<div class="product-badge" style="${BADGE_STYLES[p.badge]||''}">${p.badge}</div>`:''}
+      ${isOut?`<div class="product-badge badge-red">OUT OF STOCK</div>`:(p.badge?`<div class="product-badge" style="${BADGE_STYLES[p.badge]||''}">${p.badge}</div>`:'')}
       <div class="product-wishlist ${isWish?'active':''}" onclick="event.stopPropagation();toggleWishlist(${p.id})">${isWish?'💖':'❤️'}</div>
       <span>${p.emoji||'📦'}</span>
     </div>
@@ -81,7 +88,7 @@ function productCard(p){
       <div class="product-rating"><span class="stars">${'★'.repeat(Math.floor(p.rating||4))}${'☆'.repeat(5-Math.floor(p.rating||4))}</span><span class="rating-count">(${(p.reviews||0).toLocaleString()})</span></div>
       <div class="product-footer">
         <div class="product-price">₹${p.price.toLocaleString()}${p.original?`<span class="original">₹${p.original.toLocaleString()}</span>`:''}</div>
-        <button class="add-cart-btn" onclick="event.stopPropagation();addToCart(${p.id})">+</button>
+        <button class="add-cart-btn ${isOut?'btn-disabled':''}" ${isOut?'disabled':''} onclick="event.stopPropagation();addToCart(${p.id})">+</button>
       </div>
     </div>
   </div>`;
@@ -214,8 +221,8 @@ function openQuickView(id){
           ${p.original?`<div class="detail-original">₹${p.original.toLocaleString()}</div><div class="detail-discount">${disc}% OFF</div>`:''}
         </div>
         
-        <div class="stock-indicator ${p.stock<15?'low-stock':'in-stock'}">
-          ${p.stock<15?'⚠️ Low Stock — '+p.stock+' units left':'✓ In Stock — '+p.stock+' available'}
+        <div class="stock-indicator ${p.stock===0?'out-stock':(p.stock<15?'low-stock':'in-stock')}">
+          ${p.stock===0?'❌ Out of Stock — 0 available':(p.stock<15?'⚠️ Low Stock — '+p.stock+' units left':'✓ In Stock — '+p.stock+' available')}
         </div>
 
         <div class="variant-group">
@@ -242,8 +249,8 @@ function openQuickView(id){
         </div>
 
         <div class="detail-btns">
-          <button class="btn-primary" onclick="addQvToCart()">🛒 Add to Cart</button>
-          <button class="btn-outline" onclick="addQvToCart();closeModal('quickViewModal');showPage('checkout')">⚡ Buy Now</button>
+          <button class="btn-primary ${p.stock===0?'btn-disabled':''}" ${p.stock===0?'disabled':''} onclick="addQvToCart()">🛒 Add to Cart</button>
+          <button class="btn-outline ${p.stock===0?'btn-disabled':''}" ${p.stock===0?'disabled':''} onclick="addQvToCart();closeModal('quickViewModal');showPage('checkout')">⚡ Buy Now</button>
         </div>
       </div>
     </div>`;
@@ -423,19 +430,93 @@ function renderCheckout(){
   document.getElementById('ckName').value=currentUser?.name||'';
 }
 function placeOrder(){
-  const name=document.getElementById('ckName').value.trim(),phone=document.getElementById('ckPhone').value.trim(),addr=document.getElementById('ckAddr').value.trim();
-  if(!name||!phone||!addr){showToast('Fill all delivery details!','error');return;}
-  const cart=DB.cart(),pay=document.querySelector('input[name="payment"]:checked')?.value||'UPI';
+  if(!currentUser){
+    showToast('Please sign in to place order 🔒','error');
+    showPage('home');
+    return;
+  }
+  const name=document.getElementById('ckName').value.trim();
+  const phone=document.getElementById('ckPhone').value.trim();
+  const pin=document.getElementById('ckPin').value.trim();
+  const addr=document.getElementById('ckAddr').value.trim();
+
+  if(!name||!phone||!addr||!pin){
+    showToast('Fill all delivery details!','error');
+    return;
+  }
+
+  // Validate Phone (at least 10 digits)
+  const cleanPhone = phone.replace(/[^0-9]/g, '');
+  if(cleanPhone.length < 10){
+    showToast('Enter a valid 10-digit phone number!','error');
+    return;
+  }
+
+  // Validate PIN code (6 digits)
+  if(!/^\d{6}$/.test(pin)){
+    showToast('Enter a valid 6-digit PIN Code!','error');
+    return;
+  }
+
+  const cart=DB.cart();
+  if(!cart.length){
+    showToast('Your cart is empty!','error');
+    return;
+  }
+
+  // Stock Check & Real-time Deduction
+  const products = DB.products();
+  for(const item of cart){
+    const prod = products.find(p => p.id === item.productId);
+    if(!prod || prod.stock < item.qty){
+      showToast(`Insufficient stock for ${item.name}! Only ${prod?.stock||0} left.`, 'error');
+      return;
+    }
+  }
+
+  // Deduct Inventory in DB.products()
+  for(const item of cart){
+    const prod = products.find(p => p.id === item.productId);
+    if(prod){
+      prod.stock = Math.max(0, prod.stock - item.qty);
+    }
+  }
+  DB.save('products', products);
+
+  // Calculate Order Total
   const sub=cart.reduce((s,c)=>s+c.price*c.qty,0);
   const activePromo=DB.promo();
   const disc=activePromo ? Math.round(sub*(activePromo.percent/100)) : 0;
   const del=sub>0 && (sub-disc)<499 ? 40 : 0;
   const total=Math.max(0, sub - disc + del);
+  const pay=document.querySelector('input[name="payment"]:checked')?.value||'UPI';
 
-  const oid='ORD-'+Date.now().toString().slice(-6);
-  const order={id:oid,userId:currentUser.id,items:cart.map(c=>({productId:c.productId,name:c.name,qty:c.qty,price:c.price})),total,status:'Confirmed',address:addr+', '+document.getElementById('ckCity').value+', '+document.getElementById('ckState').value,payment:pay,date:new Date().toISOString()};
-  const orders=DB.orders();orders.unshift(order);DB.save('orders',orders);DB.save('cart',[]);DB.save('promo',null);updateCartBadge();
-  document.getElementById('successOrderId').textContent='Order '+oid;showPage('success');
+  const oid='ORD-'+new Date().getFullYear()+'-'+Math.floor(10000+Math.random()*90000);
+  const order={
+    id:oid,
+    userId:currentUser.id,
+    items:cart.map(c=>({productId:c.productId,name:c.name,qty:c.qty,price:c.price})),
+    subtotal:sub,
+    discount:disc,
+    delivery:del,
+    total,
+    status:'Confirmed',
+    address:`${addr}, ${document.getElementById('ckCity').value}, ${document.getElementById('ckState').value} - ${pin}`,
+    phone:phone,
+    payment:pay,
+    date:new Date().toISOString()
+  };
+
+  const orders=DB.orders();
+  orders.unshift(order);
+  DB.save('orders',orders);
+  DB.save('cart',[]);
+  DB.save('promo',null);
+  updateCartBadge();
+
+  document.getElementById('successOrderId').textContent='Order #'+oid;
+  showPage('success');
+  showToast('Order confirmed! Stock updated 📦','success');
 }
 function renderOrders(){
   const orders=DB.orders().filter(o=>o.userId===currentUser?.id);

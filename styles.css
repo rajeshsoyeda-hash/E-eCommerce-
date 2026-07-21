@@ -2094,9 +2094,20 @@ header {
   border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
-.stock-indicator.low-stock {
-  background: rgba(245, 158, 11, 0.15);
-  color: var(--amber);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+.stock-indicator.out-stock {
+  background: rgba(244, 63, 94, 0.15);
+  color: var(--rose);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+/* DISABLED BUTTONS */
+.btn-disabled, button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+  background: #475569 !important;
+  border-color: #64748b !important;
 }
 
