@@ -1,0 +1,263 @@
+let currentUser=null,currentPage='home',selCat='All',selProduct=null,detailQty=1,adminTab='products',editProdId=null;
+
+// AUTH
+function switchAuthTab(tab){
+  document.querySelectorAll('.auth-tab').forEach((t,i)=>t.classList.toggle('active',(i===0)===(tab==='login')));
+  document.getElementById('loginForm').style.display=tab==='login'?'block':'none';
+  document.getElementById('registerForm').style.display=tab==='register'?'block':'none';
+  document.getElementById('authError').style.display='none';
+}
+function fillDemo(e,p){document.getElementById('loginEmail').value=e;document.getElementById('loginPass').value=p;switchAuthTab('login');}
+function showAuthError(m){const el=document.getElementById('authError');el.textContent=m;el.style.display='block';}
+function handleLogin(){
+  const e=document.getElementById('loginEmail').value.trim(),p=document.getElementById('loginPass').value;
+  if(!e||!p){showAuthError('Fill all fields.');return;}
+  const user=DB.users().find(u=>u.email===e&&u.password===p);
+  if(!user){showAuthError('Invalid email or password.');return;}
+  DB.save('session',user);startApp(user);
+}
+function handleRegister(){
+  const n=document.getElementById('regName').value.trim(),e=document.getElementById('regEmail').value.trim(),p=document.getElementById('regPass').value;
+  if(!n||!e||!p){showAuthError('Fill all fields.');return;}
+  if(p.length<6){showAuthError('Password min 6 chars.');return;}
+  const users=DB.users();
+  if(users.find(u=>u.email===e)){showAuthError('Email exists.');return;}
+  const nu={id:Date.now(),name:n,email:e,password:p,role:'user'};
+  users.push(nu);DB.save('users',users);DB.save('session',nu);startApp(nu);
+}
+function handleLogout(){DB.save('session',null);DB.save('cart',[]);currentUser=null;document.getElementById('authScreen').style.display='flex';document.getElementById('appScreen').style.display='none';showToast('Signed out.','info');}
+function startApp(user){
+  currentUser=user;
+  document.getElementById('authScreen').style.display='none';
+  document.getElementById('appScreen').style.display='block';
+  document.getElementById('headerName').textContent=user.name.split(' ')[0];
+  document.getElementById('headerAvatar').textContent=user.name.charAt(0).toUpperCase();
+  const roleTag=document.getElementById('headerRole'),adminLink=document.getElementById('adminNavLink');
+  if(user.role==='admin'){roleTag.style.display='inline';adminLink.style.display='inline';}
+  else{roleTag.style.display='none';adminLink.style.display='none';}
+  showPage('home');updateCartBadge();
+  showToast('Welcome, '+user.name.split(' ')[0]+'! 🛍️','success');
+}
+
+// ROUTING
+function showPage(page){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(n=>n.classList.remove('active'));
+  currentPage=page;
+  document.getElementById('page-'+page)?.classList.add('active');
+  const nm={home:0,products:1,orders:2,admin:3};
+  const nl=document.querySelectorAll('.nav-link');
+  if(nm[page]!==undefined)nl[nm[page]]?.classList.add('active');
+  if(page==='home')renderFeatured();
+  if(page==='products'){selCat='All';renderCategories();renderAllProducts();}
+  if(page==='orders')renderOrders();
+  if(page==='admin'){if(currentUser?.role!=='admin'){showToast('Admin only!','error');showPage('home');return;}renderAdmin();}
+  if(page==='checkout')renderCheckout();
+  window.scrollTo(0,0);closeCart();
+}
+
+// PRODUCTS
+function productCard(p){
+  const cat=CAT_COLORS[p.category]||{bg:'#f3f4f6',color:'#555'};
+  return`<div class="product-card" onclick="openDetail(${p.id})">
+    <div class="product-img" style="background:${cat.bg}">
+      ${p.badge?`<div class="product-badge" style="${BADGE_STYLES[p.badge]||''}">${p.badge}</div>`:''}
+      <div class="product-wishlist" onclick="event.stopPropagation();toggleWishlist(this)">❤️</div>
+      <span>${p.emoji||'📦'}</span>
+    </div>
+    <div class="product-body">
+      <div class="product-cat">${p.category}</div>
+      <div class="product-name">${p.name}</div>
+      <div class="product-rating"><span class="stars">${'★'.repeat(Math.floor(p.rating||4))}${'☆'.repeat(5-Math.floor(p.rating||4))}</span><span class="rating-count">(${(p.reviews||0).toLocaleString()})</span></div>
+      <div class="product-footer">
+        <div class="product-price">₹${p.price.toLocaleString()}${p.original?`<span class="original">₹${p.original.toLocaleString()}</span>`:''}</div>
+        <button class="add-cart-btn" onclick="event.stopPropagation();addToCart(${p.id})">+</button>
+      </div>
+    </div>
+  </div>`;
+}
+function renderFeatured(){document.getElementById('featuredGrid').innerHTML=DB.products().slice(0,8).map(productCard).join('');}
+function renderCategories(){
+  const cats=['All',...new Set(DB.products().map(p=>p.category))];
+  document.getElementById('categoriesRow').innerHTML=cats.map(c=>`<div class="cat-pill ${c===selCat?'active':''}" onclick="filterByCategory('${c}')">${CAT_EMOJI[c]||''} ${c}</div>`).join('');
+}
+function filterByCategory(cat){selCat=cat;renderCategories();renderAllProducts();}
+function renderAllProducts(){
+  let prods=DB.products();
+  if(selCat!=='All')prods=prods.filter(p=>p.category===selCat);
+  const q=document.getElementById('searchInput').value.toLowerCase();
+  if(q)prods=prods.filter(p=>p.name.toLowerCase().includes(q)||p.category.toLowerCase().includes(q));
+  document.getElementById('productCount').textContent=prods.length+' products';
+  document.getElementById('allProductsGrid').innerHTML=prods.length?prods.map(productCard).join(''):`<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--muted)"><div style="font-size:3rem;margin-bottom:1rem">🔍</div><div style="font-weight:700">No products found</div></div>`;
+}
+function handleSearch(){if(currentPage==='products')renderAllProducts();else showPage('products');}
+function toggleWishlist(el){el.classList.toggle('active');showToast(el.classList.contains('active')?'Added to wishlist ❤️':'Removed from wishlist','info');}
+function openDetail(id){
+  const p=DB.products().find(p=>p.id===id);if(!p)return;
+  selProduct=p;detailQty=1;
+  const cat=CAT_COLORS[p.category]||{bg:'#f3f4f6',color:'#555'};
+  const disc=p.original?Math.round((1-p.price/p.original)*100):0;
+  document.getElementById('productDetailContent').innerHTML=`
+    <div><div class="product-detail-img" style="background:${cat.bg}"><span style="font-size:7rem">${p.emoji||'📦'}</span></div></div>
+    <div>
+      <div style="font-size:.75rem;font-weight:700;color:var(--accent);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.5rem">${p.category}</div>
+      <h1 style="font-size:1.75rem;font-weight:900;letter-spacing:-.03em;margin-bottom:.5rem">${p.name}</h1>
+      <div class="product-rating"><span class="stars" style="font-size:1rem">${'★'.repeat(Math.floor(p.rating||4))}${'☆'.repeat(5-Math.floor(p.rating||4))}</span><span class="rating-count">${p.rating} (${(p.reviews||0).toLocaleString()} reviews)</span></div>
+      <div class="detail-price-row">
+        <div class="detail-price">₹${p.price.toLocaleString()}</div>
+        ${p.original?`<div class="detail-original">₹${p.original.toLocaleString()}</div><div class="detail-discount">${disc}% OFF</div>`:''}
+      </div>
+      <p class="detail-desc">${p.desc||'High quality product.'}</p>
+      <div class="qty-row">
+        <span class="qty-label">Quantity:</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="qty-btn" onclick="changeDetailQty(-1)">−</button>
+          <span class="qty-num" id="detailQtyNum">1</span>
+          <button class="qty-btn" onclick="changeDetailQty(1)">+</button>
+        </div>
+        <span style="font-size:.8rem;color:${p.stock<10?'var(--red)':'var(--green)'}">
+          ${p.stock<10?'⚠ Only '+p.stock+' left':'✓ In Stock ('+p.stock+')'}
+        </span>
+      </div>
+      <div class="detail-btns">
+        <button class="btn-primary" onclick="addToCart(${p.id},detailQty);toggleCart()">🛒 Add to Cart</button>
+        <button class="btn-outline" onclick="addToCart(${p.id},detailQty);showPage('checkout')">⚡ Buy Now</button>
+      </div>
+      <div class="spec-grid">
+        <div class="spec-item"><div class="spec-label">Category</div><div class="spec-value">${p.category}</div></div>
+        <div class="spec-item"><div class="spec-label">Stock</div><div class="spec-value">${p.stock} units</div></div>
+        <div class="spec-item"><div class="spec-label">Rating</div><div class="spec-value">${p.rating} / 5.0 ★</div></div>
+        <div class="spec-item"><div class="spec-label">Delivery</div><div class="spec-value">${p.price>=499?'Free':'₹40'}</div></div>
+      </div>
+    </div>`;
+  showPage('detail');
+}
+function changeDetailQty(d){detailQty=Math.max(1,Math.min(selProduct?.stock||10,detailQty+d));document.getElementById('detailQtyNum').textContent=detailQty;}
+
+// CART
+function addToCart(id,qty=1){
+  const p=DB.products().find(p=>p.id===id);if(!p)return;
+  const cart=DB.cart(),ex=cart.find(c=>c.productId===id);
+  if(ex)ex.qty=Math.min(ex.qty+qty,p.stock);
+  else cart.push({productId:id,name:p.name,price:p.price,emoji:p.emoji,qty});
+  DB.save('cart',cart);updateCartBadge();renderCartSidebar();
+  showToast(p.name+' added to cart! 🛒','success');
+}
+function removeFromCart(id){DB.save('cart',DB.cart().filter(c=>c.productId!==id));updateCartBadge();renderCartSidebar();}
+function changeCartQty(id,d){
+  const cart=DB.cart(),item=cart.find(c=>c.productId===id);if(!item)return;
+  item.qty=Math.max(1,item.qty+d);DB.save('cart',cart);updateCartBadge();renderCartSidebar();
+}
+function updateCartBadge(){const t=DB.cart().reduce((s,c)=>s+c.qty,0);document.getElementById('cartCount').textContent=t;document.getElementById('cartItemCount').textContent=t;}
+function toggleCart(){const c=document.getElementById('cartSidebar'),o=document.getElementById('cartOverlay');const op=c.classList.toggle('open');o.classList.toggle('show',op);if(op)renderCartSidebar();}
+function closeCart(){document.getElementById('cartSidebar').classList.remove('open');document.getElementById('cartOverlay').classList.remove('show');}
+function renderCartSidebar(){
+  const cart=DB.cart(),body=document.getElementById('cartBody'),footer=document.getElementById('cartFooter');
+  if(!cart.length){body.innerHTML=`<div class="cart-empty"><div class="cart-empty-icon">🛒</div><div style="font-weight:700;margin-bottom:.5rem">Your cart is empty</div><div style="font-size:.85rem">Add products to get started!</div></div>`;footer.innerHTML='';return;}
+  body.innerHTML=cart.map(item=>`
+    <div class="cart-item">
+      <div class="cart-item-img">${item.emoji||'📦'}</div>
+      <div class="cart-item-info">
+        <div class="cart-item-name">${item.name}</div>
+        <div class="cart-item-price">₹${(item.price*item.qty).toLocaleString()}</div>
+        <div class="qty-control">
+          <button class="qty-btn" onclick="changeCartQty(${item.productId},-1)">−</button>
+          <span class="qty-num">${item.qty}</span>
+          <button class="qty-btn" onclick="changeCartQty(${item.productId},1)">+</button>
+        </div>
+      </div>
+      <div class="remove-btn" onclick="removeFromCart(${item.productId})">✕</div>
+    </div>`).join('');
+  const sub=cart.reduce((s,c)=>s+c.price*c.qty,0),del=sub>=499?0:40;
+  footer.innerHTML=`<div class="cart-summary">
+    <div class="cart-row"><span>Subtotal</span><span>₹${sub.toLocaleString()}</span></div>
+    <div class="cart-row"><span>Delivery</span><span>${del===0?'<span style="color:var(--green)">FREE</span>':'₹'+del}</span></div>
+    <div class="cart-row total"><span>Total</span><span>₹${(sub+del).toLocaleString()}</span></div>
+  </div>
+  <button class="checkout-btn" onclick="closeCart();showPage('checkout')">Proceed to Checkout →</button>`;
+}
+
+// CHECKOUT
+function renderCheckout(){
+  const cart=DB.cart();
+  if(!cart.length){showPage('home');showToast('Cart is empty!','error');return;}
+  const sub=cart.reduce((s,c)=>s+c.price*c.qty,0),del=sub>=499?0:40;
+  document.getElementById('checkoutItems').innerHTML=cart.map(i=>`<div class="order-item-row"><div class="order-item-img">${i.emoji||'📦'}</div><div class="order-item-name">${i.name} ×${i.qty}</div><div class="order-item-price">₹${(i.price*i.qty).toLocaleString()}</div></div>`).join('');
+  document.getElementById('checkoutSummary').innerHTML=`<div class="summary-row"><span>Subtotal</span><span>₹${sub.toLocaleString()}</span></div><div class="summary-row"><span>Delivery</span><span>${del===0?'FREE':'₹'+del}</span></div><div class="summary-row total"><span>Total</span><span>₹${(sub+del).toLocaleString()}</span></div>`;
+  document.getElementById('ckName').value=currentUser?.name||'';
+}
+function placeOrder(){
+  const name=document.getElementById('ckName').value.trim(),phone=document.getElementById('ckPhone').value.trim(),addr=document.getElementById('ckAddr').value.trim();
+  if(!name||!phone||!addr){showToast('Fill all delivery details!','error');return;}
+  const cart=DB.cart(),pay=document.querySelector('input[name="payment"]:checked')?.value||'UPI';
+  const sub=cart.reduce((s,c)=>s+c.price*c.qty,0),del=sub>=499?0:40;
+  const oid='ORD-'+Date.now().toString().slice(-6);
+  const order={id:oid,userId:currentUser.id,items:cart.map(c=>({productId:c.productId,name:c.name,qty:c.qty,price:c.price})),total:sub+del,status:'Confirmed',address:addr+', '+document.getElementById('ckCity').value+', '+document.getElementById('ckState').value,payment:pay,date:new Date().toISOString()};
+  const orders=DB.orders();orders.unshift(order);DB.save('orders',orders);DB.save('cart',[]);updateCartBadge();
+  document.getElementById('successOrderId').textContent='Order '+oid;showPage('success');
+}
+function renderOrders(){
+  const orders=DB.orders().filter(o=>o.userId===currentUser?.id);
+  const el=document.getElementById('ordersContent');
+  if(!orders.length){el.innerHTML=`<div style="text-align:center;padding:3rem;color:var(--muted)"><div style="font-size:3rem;margin-bottom:1rem">📦</div><div style="font-weight:700;margin-bottom:.5rem">No orders yet</div><button class="btn-primary" style="max-width:200px;margin:1rem auto 0;display:flex" onclick="showPage('products')">Shop Now →</button></div>`;return;}
+  el.innerHTML=`<table class="orders-table"><thead><tr><th>Order ID</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th>Date</th></tr></thead><tbody>${orders.map(o=>`<tr><td><span style="font-family:var(--mono);font-weight:700">${o.id}</span></td><td>${o.items.map(i=>i.name).join(', ')}</td><td style="font-weight:700">₹${o.total.toLocaleString()}</td><td>${o.payment}</td><td><span class="badge ${STATUS_BADGE[o.status]||'badge-blue'}">${o.status}</span></td><td style="color:var(--muted);font-size:.8rem">${new Date(o.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</td></tr>`).join('')}</tbody></table>`;
+}
+
+// ADMIN
+function renderAdmin(){
+  const prods=DB.products(),orders=DB.orders(),users=DB.users();
+  document.getElementById('adminProducts').textContent=prods.length;
+  document.getElementById('adminOrders').textContent=orders.length;
+  document.getElementById('adminUsers').textContent=users.length;
+  document.getElementById('adminRevenue').textContent='₹'+orders.reduce((s,o)=>s+o.total,0).toLocaleString();
+  renderAdminTab(adminTab);
+}
+function switchAdminTab(tab,el){adminTab=tab;document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderAdminTab(tab);}
+function renderAdminTab(tab){
+  const el=document.getElementById('adminContent');
+  if(tab==='products'){
+    el.innerHTML=`<div class="table-wrap"><div class="table-head"><div class="table-head-title">Products (${DB.products().length})</div><button class="action-btn" style="background:var(--accent);color:#fff;padding:8px 16px" onclick="openProductModal()">+ Add Product</button></div>
+    <table class="data-table"><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Actions</th></tr></thead>
+    <tbody>${DB.products().map(p=>`<tr><td><span style="font-size:1.2rem">${p.emoji}</span> <strong>${p.name}</strong></td><td><span class="badge" style="background:${CAT_COLORS[p.category]?.bg||'#f3f4f6'};color:${CAT_COLORS[p.category]?.color||'#555'}">${p.category}</span></td><td style="font-weight:700">₹${p.price.toLocaleString()}</td><td><span style="color:${p.stock<10?'var(--red)':'var(--green)'}">${p.stock}</span></td><td><button class="action-btn" style="background:var(--blue-light);color:var(--blue);margin-right:6px" onclick="editProduct(${p.id})">Edit</button><button class="action-btn" style="background:var(--red-light);color:var(--red)" onclick="deleteProduct(${p.id})">Delete</button></td></tr>`).join('')}</tbody></table></div>`;
+  } else if(tab==='orders'){
+    const STATUS=['Confirmed','Shipped','Delivered','Cancelled'];
+    el.innerHTML=`<div class="table-wrap"><div class="table-head"><div class="table-head-title">All Orders (${DB.orders().length})</div></div>
+    <table class="data-table"><thead><tr><th>Order ID</th><th>Customer</th><th>Total</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+    <tbody>${DB.orders().map(o=>{const u=DB.users().find(u=>u.id===o.userId);return`<tr><td><span style="font-family:var(--mono);font-weight:700">${o.id}</span></td><td>${u?.name||'Unknown'}</td><td style="font-weight:700">₹${o.total.toLocaleString()}</td><td><select onchange="updateOrderStatus('${o.id}',this.value)" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border);font-family:var(--font);font-size:.8rem">${STATUS.map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}</select></td><td style="color:var(--muted);font-size:.8rem">${new Date(o.date).toLocaleDateString('en-IN')}</td><td><button class="action-btn" style="background:var(--red-light);color:var(--red)" onclick="deleteOrder('${o.id}')">Delete</button></td></tr>`;}).join('')}</tbody></table></div>`;
+  } else if(tab==='users'){
+    el.innerHTML=`<div class="table-wrap"><div class="table-head"><div class="table-head-title">Users (${DB.users().length})</div></div>
+    <table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Action</th></tr></thead>
+    <tbody>${DB.users().map(u=>`<tr><td><strong>${u.name}</strong></td><td>${u.email}</td><td><span class="badge ${u.role==='admin'?'badge-red':'badge-blue'}">${u.role.toUpperCase()}</span></td><td><button class="action-btn" style="background:var(--amber-light);color:var(--amber)" onclick="toggleUserRole(${u.id})">${u.role==='admin'?'Make User':'Make Admin'}</button></td></tr>`).join('')}</tbody></table></div>`;
+  }
+}
+function updateOrderStatus(id,status){const orders=DB.orders(),o=orders.find(o=>o.id===id);if(o)o.status=status;DB.save('orders',orders);showToast('Order '+id+' → '+status,'success');}
+function deleteOrder(id){DB.save('orders',DB.orders().filter(o=>o.id!==id));renderAdmin();showToast('Order deleted.','error');}
+function toggleUserRole(id){const users=DB.users(),u=users.find(u=>u.id===id);if(!u)return;u.role=u.role==='admin'?'user':'admin';DB.save('users',users);renderAdmin();showToast(u.name+' is now '+u.role,'info');}
+function openProductModal(id){
+  editProdId=id||null;
+  document.getElementById('productModalTitle').textContent=id?'Edit Product':'Add Product';
+  if(id){const p=DB.products().find(p=>p.id===id);if(!p)return;document.getElementById('pName').value=p.name;document.getElementById('pPrice').value=p.price;document.getElementById('pOriginal').value=p.original||'';document.getElementById('pCat').value=p.category;document.getElementById('pStock').value=p.stock;document.getElementById('pDesc').value=p.desc||'';document.getElementById('pEmoji').value=p.emoji||'';document.getElementById('pBadge').value=p.badge||'';}
+  else{['pName','pPrice','pOriginal','pStock','pDesc','pEmoji'].forEach(i=>document.getElementById(i).value='');document.getElementById('pBadge').value='';document.getElementById('pCat').value='Electronics';}
+  document.getElementById('productModal').classList.add('open');
+}
+function editProduct(id){openProductModal(id);}
+function saveProduct(){
+  const name=document.getElementById('pName').value.trim(),price=parseFloat(document.getElementById('pPrice').value);
+  if(!name||!price){showToast('Name and price required!','error');return;}
+  const prods=DB.products(),data={name,price,original:parseFloat(document.getElementById('pOriginal').value)||0,category:document.getElementById('pCat').value,stock:parseInt(document.getElementById('pStock').value)||100,desc:document.getElementById('pDesc').value,emoji:document.getElementById('pEmoji').value||'📦',badge:document.getElementById('pBadge').value,rating:4.5,reviews:0};
+  if(editProdId){const idx=prods.findIndex(p=>p.id===editProdId);if(idx!==-1)prods[idx]={...prods[idx],...data};showToast('Product updated!','success');}
+  else{prods.push({id:Date.now(),...data});showToast('Product added!','success');}
+  DB.save('products',prods);closeModal('productModal');renderAdmin();
+}
+function deleteProduct(id){DB.save('products',DB.products().filter(p=>p.id!==id));renderAdmin();showToast('Product deleted.','error');}
+
+// UI
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function closeModalOutside(e,id){if(e.target.id===id)closeModal(id);}
+function showToast(msg,type='success'){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;document.getElementById('toastIcon').textContent=type==='success'?'✓':type==='error'?'✕':'ℹ';t.className='toast '+type+' show';setTimeout(()=>t.classList.remove('show'),3000);}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  initDB();
+  const s=DB.session();if(s)startApp(s);
+  document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')handleLogin();});
+});
