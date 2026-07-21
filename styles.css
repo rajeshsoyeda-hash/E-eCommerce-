@@ -526,6 +526,36 @@ header {
   box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
 }
 
+/* ANIMATIONS & KEYFRAMES */
+@keyframes textReveal {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes floatBlob {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-20px) rotate(6deg);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
 .hero-banner::before {
   content: '';
   position: absolute;
@@ -535,6 +565,7 @@ header {
   height: 500px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(99, 102, 241, 0.25), transparent 70%);
+  animation: floatBlob 12s ease-in-out infinite;
 }
 
 .hero-label {
@@ -550,6 +581,7 @@ header {
   font-weight: 700;
   letter-spacing: 0.06em;
   margin-bottom: 1.5rem;
+  animation: textReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s backwards;
 }
 
 .hero-title {
@@ -558,6 +590,7 @@ header {
   letter-spacing: -0.03em;
   line-height: 1.08;
   margin-bottom: 1.25rem;
+  animation: textReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.25s backwards;
 }
 
 .hero-title span {
@@ -571,12 +604,14 @@ header {
   font-size: 1.1rem;
   max-width: 520px;
   margin-bottom: 2.25rem;
+  animation: textReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s backwards;
 }
 
 .hero-btns {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
+  animation: textReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.55s backwards;
 }
 
 .btn-hero {
@@ -620,6 +655,7 @@ header {
   margin-top: 3rem;
   padding-top: 2rem;
   border-top: 1px solid var(--border);
+  animation: textReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.7s backwards;
 }
 
 .hero-stat-num {
@@ -694,7 +730,7 @@ header {
   box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
 }
 
-/* PRODUCT GRID */
+/* PRODUCT GRID & CARDS */
 .product-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
@@ -707,7 +743,7 @@ header {
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease, background 0.3s ease;
   cursor: pointer;
   position: relative;
   box-shadow: var(--shadow-sm);
@@ -716,9 +752,69 @@ header {
 .product-card:hover {
   border-color: var(--border-focus);
   transform: translateY(-6px);
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5), 0 0 20px rgba(99, 102, 241, 0.2);
-  background: rgba(30, 41, 59, 0.8);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 30px rgba(99, 102, 241, 0.25);
+  background: rgba(30, 41, 59, 0.85);
 }
+
+.product-img {
+  height: 190px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4.5rem;
+  position: relative;
+  background: rgba(15, 23, 42, 0.5) !important;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.product-img span {
+  display: inline-block;
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: center;
+}
+
+.product-card:hover .product-img span {
+  transform: scale(1.18) rotate(-3deg);
+}
+
+/* SHIMMER SKELETON LOADERS */
+.skeleton-card {
+  background: rgba(30, 41, 59, 0.4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.skeleton-img {
+  height: 190px;
+  width: 100%;
+  background: linear-gradient(90deg, rgba(30, 41, 59, 0.6) 25%, rgba(51, 65, 85, 0.8) 50%, rgba(30, 41, 59, 0.6) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite linear;
+}
+
+.skeleton-body {
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeleton-line {
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(30, 41, 59, 0.6) 25%, rgba(51, 65, 85, 0.8) 50%, rgba(30, 41, 59, 0.6) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite linear;
+}
+
+.skeleton-line.short { width: 35%; }
+.skeleton-line.medium { width: 65%; }
+.skeleton-line.full { width: 100%; }
+.skeleton-line.title { height: 18px; width: 85%; }
+
 
 .product-img {
   height: 190px;
