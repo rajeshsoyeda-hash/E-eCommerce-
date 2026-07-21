@@ -161,7 +161,18 @@ function changeCartQty(id,d){
   const cart=DB.cart(),item=cart.find(c=>c.productId===id);if(!item)return;
   item.qty=Math.max(1,item.qty+d);DB.save('cart',cart);updateCartBadge();renderCartSidebar();
 }
-function updateCartBadge(){const t=DB.cart().reduce((s,c)=>s+c.qty,0);document.getElementById('cartCount').textContent=t;document.getElementById('cartItemCount').textContent=t;}
+function updateCartBadge(){
+  const t=DB.cart().reduce((s,c)=>s+c.qty,0);
+  const el=document.getElementById('cartCount');
+  if(el){
+    el.textContent=t;
+    el.classList.remove('pop');
+    void el.offsetWidth;
+    el.classList.add('pop');
+  }
+  const elItem=document.getElementById('cartItemCount');
+  if(elItem) elItem.textContent=t;
+}
 function toggleCart(){const c=document.getElementById('cartSidebar'),o=document.getElementById('cartOverlay');const op=c.classList.toggle('open');o.classList.toggle('show',op);if(op)renderCartSidebar();}
 function closeCart(){document.getElementById('cartSidebar').classList.remove('open');document.getElementById('cartOverlay').classList.remove('show');}
 function renderCartSidebar(){
