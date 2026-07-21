@@ -51,7 +51,7 @@ function showPage(page){
   document.querySelectorAll('.nav-link').forEach(n=>n.classList.remove('active'));
   currentPage=page;
   document.getElementById('page-'+page)?.classList.add('active');
-  const nm={home:0,products:1,orders:2,admin:3};
+  const nm={home:0,products:1,orders:2,admin:4};
   const nl=document.querySelectorAll('.nav-link');
   if(nm[page]!==undefined)nl[nm[page]]?.classList.add('active');
   if(page==='home')renderFeatured();
@@ -572,6 +572,11 @@ function saveProduct(){
   DB.save('products',prods);closeModal('productModal');renderAdmin();
 }
 function deleteProduct(id){DB.save('products',DB.products().filter(p=>p.id!==id));renderAdmin();showToast('Product deleted.','error');}
+
+function openModal(id){
+  const el = document.getElementById(id);
+  if(el) el.classList.add('open');
+}
 
 function openDevModal(){
   openModal('devModal');
