@@ -2278,3 +2278,23 @@ header {
   margin-top: 1.5rem;
 }
 
+.dev-actions-grid a {
+  text-decoration: none;
+  text-align: center;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  padding: 0.75rem 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 640px) {
+  .dev-actions-grid {
+    grid-template-columns: 1fr;
+  }
+  .spec-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
