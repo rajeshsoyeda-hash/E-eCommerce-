@@ -63,11 +63,13 @@ function renderSkeletons(containerId, count=8){
   el.innerHTML=Array(count).fill(skeletonHtml).join('');
 }
 
+let selectedColor='Midnight Slate',selectedSize='Standard',currentQvQty=1;
+
 // PRODUCTS
 function productCard(p){
   const cat=CAT_COLORS[p.category]||{bg:'#f3f4f6',color:'#555'};
   const isWish=DB.wishlist().includes(p.id);
-  return`<div class="product-card" onclick="openDetail(${p.id})">
+  return`<div class="product-card" onclick="openQuickView(${p.id})">
     <div class="product-img" style="background:${cat.bg}">
       ${p.badge?`<div class="product-badge" style="${BADGE_STYLES[p.badge]||''}">${p.badge}</div>`:''}
       <div class="product-wishlist ${isWish?'active':''}" onclick="event.stopPropagation();toggleWishlist(${p.id})">${isWish?'💖':'❤️'}</div>
@@ -174,6 +176,113 @@ function removePromoCode(){
   showToast('Promo code removed','info');
   renderCartSidebar();
   if(currentPage==='checkout') renderCheckout();
+}
+
+// QUICK VIEW MODAL
+function openQuickView(id){
+  const p=DB.products().find(p=>p.id===id);
+  if(!p)return;
+  selProduct=p;
+  currentQvQty=1;
+  selectedColor=p.category==='Fashion'?'Midnight Black':'Midnight Slate';
+  selectedSize=p.category==='Electronics'?'256GB':(p.category==='Fashion'?'M':'Standard');
+
+  const cat=CAT_COLORS[p.category]||{bg:'#f3f4f6',color:'#555'};
+  const disc=p.original?Math.round((1-p.price/p.original)*100):0;
+  
+  const colors=p.category==='Fashion'?['Midnight Black','Classic Blue','Crimson Red']:['Midnight Slate','Titanium Silver','Deep Indigo'];
+  const sizes=p.category==='Electronics'?['128GB','256GB','512GB']:(p.category==='Fashion'?['S','M','L','XL']:['Standard','Pro Max']);
+
+  document.getElementById('quickViewContent').innerHTML=`
+    <div class="qv-grid">
+      <div>
+        <div class="qv-preview-box" id="qvPreview" style="background:${cat.bg}">
+          <span>${p.emoji||'📦'}</span>
+        </div>
+        <div class="qv-thumbnails">
+          <div class="qv-thumb-pill active" onclick="switchQvThumb(this, '${p.emoji||'📦'}')">📐 Front</div>
+          <div class="qv-thumb-pill" onclick="switchQvThumb(this, '🔄')">🔄 Angle</div>
+          <div class="qv-thumb-pill" onclick="switchQvThumb(this, '🔍')">🔍 Detail</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:.75rem;font-weight:700;color:var(--accent);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">${p.category}</div>
+        <h2 style="font-size:1.4rem;font-weight:900;margin-bottom:6px">${p.name}</h2>
+        <div class="product-rating" style="margin-bottom:10px"><span class="stars">${'★'.repeat(Math.floor(p.rating||4))}${'☆'.repeat(5-Math.floor(p.rating||4))}</span><span class="rating-count">${p.rating} (${(p.reviews||0).toLocaleString()})</span></div>
+        <div class="detail-price-row" style="margin:.75rem 0">
+          <div class="detail-price">₹${p.price.toLocaleString()}</div>
+          ${p.original?`<div class="detail-original">₹${p.original.toLocaleString()}</div><div class="detail-discount">${disc}% OFF</div>`:''}
+        </div>
+        
+        <div class="stock-indicator ${p.stock<15?'low-stock':'in-stock'}">
+          ${p.stock<15?'⚠️ Low Stock — '+p.stock+' units left':'✓ In Stock — '+p.stock+' available'}
+        </div>
+
+        <div class="variant-group">
+          <div class="variant-label">Select Color: <span id="selectedColorLabel" style="color:var(--text);font-weight:800">${selectedColor}</span></div>
+          <div class="variant-pills">
+            ${colors.map(c=>`<div class="variant-pill ${c===selectedColor?'active':''}" onclick="selectQvColor(this, '${c}')">${c}</div>`).join('')}
+          </div>
+        </div>
+
+        <div class="variant-group">
+          <div class="variant-label">Select Option: <span id="selectedSizeLabel" style="color:var(--text);font-weight:800">${selectedSize}</span></div>
+          <div class="variant-pills">
+            ${sizes.map(s=>`<div class="variant-pill ${s===selectedSize?'active':''}" onclick="selectQvSize(this, '${s}')">${s}</div>`).join('')}
+          </div>
+        </div>
+
+        <div class="qty-row" style="margin-bottom:1.25rem">
+          <span class="qty-label">Quantity:</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button class="qty-btn" onclick="changeQvQty(-1)">−</button>
+            <span class="qty-num" id="qvQtyNum">1</span>
+            <button class="qty-btn" onclick="changeQvQty(1)">+</button>
+          </div>
+        </div>
+
+        <div class="detail-btns">
+          <button class="btn-primary" onclick="addQvToCart()">🛒 Add to Cart</button>
+          <button class="btn-outline" onclick="addQvToCart();closeModal('quickViewModal');showPage('checkout')">⚡ Buy Now</button>
+        </div>
+      </div>
+    </div>`;
+
+  openModal('quickViewModal');
+}
+
+function switchQvThumb(el, icon){
+  document.querySelectorAll('.qv-thumb-pill').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  const box=document.getElementById('qvPreview');
+  if(box) box.innerHTML=`<span>${icon}</span>`;
+}
+
+function selectQvColor(el, color){
+  selectedColor=color;
+  el.parentElement.querySelectorAll('.variant-pill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('selectedColorLabel').textContent=color;
+}
+
+function selectQvSize(el, size){
+  selectedSize=size;
+  el.parentElement.querySelectorAll('.variant-pill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('selectedSizeLabel').textContent=size;
+}
+
+function changeQvQty(d){
+  currentQvQty=Math.max(1,Math.min(selProduct?.stock||10,currentQvQty+d));
+  const el=document.getElementById('qvQtyNum');
+  if(el) el.textContent=currentQvQty;
+}
+
+function addQvToCart(){
+  if(!selProduct)return;
+  addToCart(selProduct.id, currentQvQty);
+  closeModal('quickViewModal');
+  showToast(`${selProduct.name} (${selectedColor}, ${selectedSize}) added to cart! 🛒`,'success');
 }
 
 function openDetail(id){

@@ -194,6 +194,16 @@
   <div class="cart-body" id="cartBody"></div>
   <div class="cart-footer" id="cartFooter"></div>
 </div>
+<!-- QUICK VIEW PRODUCT MODAL -->
+<div class="modal-overlay" id="quickViewModal" onclick="closeModalOutside(event,'quickViewModal')">
+  <div class="modal qv-modal">
+    <div class="modal-header">
+      <div class="modal-title">⚡ Quick Product View</div>
+      <button class="modal-close" onclick="closeModal('quickViewModal')">✕</button>
+    </div>
+    <div id="quickViewContent"></div>
+  </div>
+</div>
 <!-- PRODUCT MODAL -->
 <div class="modal-overlay" id="productModal" onclick="closeModalOutside(event,'productModal')">
   <div class="modal">
