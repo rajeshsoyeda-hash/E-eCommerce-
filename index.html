@@ -10,8 +10,8 @@
 <body>
 <!-- AUTH -->
 <div id="authScreen">
-  <button class="header-btn theme-toggle-btn auth-theme-toggle" onclick="toggleTheme()" aria-label="Toggle Theme" title="Toggle Theme" style="position: absolute; top: 20px; right: 20px; z-index: 100;">
-    <span class="theme-icon">🌙</span> <span class="theme-label">Dark Mode</span>
+  <button class="header-btn theme-toggle-btn auth-theme-toggle" onclick="toggleTheme()" aria-label="Toggle Theme" title="Toggle Theme">
+    <span class="theme-icon">☀️</span> <span class="theme-label">Light Mode</span>
   </button>
   <div class="auth-box">
     <div class="auth-brand">
@@ -52,7 +52,7 @@
       </div>
       <div class="header-actions">
         <button class="header-btn theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" aria-label="Toggle Theme" title="Toggle Theme">
-          <span class="theme-icon">🌙</span> <span class="theme-label">Dark Mode</span>
+          <span class="theme-icon">☀️</span> <span class="theme-label">Light Mode</span>
         </button>
         <div class="user-chip" onclick="showPage('orders')">
           <div class="user-chip-avatar" id="headerAvatar">R</div>
@@ -297,7 +297,10 @@
   </div>
 </div>
 <!-- TOAST -->
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast">
+  <span id="toastIcon"></span>
+  <span id="toastMsg"></span>
+</div>
 <script src="db.js"></script>
 <script src="app.js"></script>
 </body>

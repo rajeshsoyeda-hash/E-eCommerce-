@@ -588,9 +588,9 @@ function showToast(msg,type='success'){const t=document.getElementById('toast');
 
 // THEME SWITCHER SYSTEM
 function initTheme() {
+  // Default is DARK. Only go light if user explicitly saved 'light' before.
   const savedTheme = localStorage.getItem('theme');
-  const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
-  const isLight = savedTheme === 'light' || (!savedTheme && prefersLight);
+  const isLight = savedTheme === 'light';
   document.body.classList.toggle('light-theme', isLight);
   updateThemeUI(isLight);
 }
@@ -598,13 +598,15 @@ function toggleTheme() {
   const isLight = document.body.classList.toggle('light-theme');
   localStorage.setItem('theme', isLight ? 'light' : 'dark');
   updateThemeUI(isLight);
+  showToast(isLight ? '☀️ Light Mode On' : '🌙 Dark Mode On', 'info');
 }
 function updateThemeUI(isLight) {
+  // Button shows what you'll SWITCH TO, not current mode
   document.querySelectorAll('.theme-icon').forEach(icon => {
-    icon.textContent = isLight ? '☀️' : '🌙';
+    icon.textContent = isLight ? '🌙' : '☀️';
   });
   document.querySelectorAll('.theme-label').forEach(label => {
-    label.textContent = isLight ? 'Light Mode' : 'Dark Mode';
+    label.textContent = isLight ? 'Dark Mode' : 'Light Mode';
   });
 }
 

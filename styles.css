@@ -108,6 +108,13 @@ h1, h2, h3, .brand, .hero-title, .section-title, .modal-title {
   overflow: hidden;
 }
 
+.auth-theme-toggle {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 100;
+}
+
 .auth-box {
   background: rgba(15, 23, 42, 0.85);
   -webkit-backdrop-filter: var(--backdrop);
@@ -413,6 +420,52 @@ header {
   background: rgba(51, 65, 85, 0.9);
   border-color: rgba(255, 255, 255, 0.2);
   transform: translateY(-1px);
+}
+
+/* THEME TOGGLE BUTTON - special pill style */
+.theme-toggle-btn {
+  background: rgba(99, 102, 241, 0.15) !important;
+  border: 1.5px solid rgba(99, 102, 241, 0.4) !important;
+  color: #a5b4fc !important;
+  border-radius: 100px !important;
+  padding: 0.5rem 1.1rem !important;
+  gap: 7px;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.theme-toggle-btn:hover {
+  background: rgba(99, 102, 241, 0.3) !important;
+  border-color: rgba(99, 102, 241, 0.7) !important;
+  color: #c7d2fe !important;
+  box-shadow: 0 0 18px rgba(99, 102, 241, 0.35) !important;
+  transform: translateY(-1px) !important;
+}
+
+.theme-toggle-btn .theme-icon {
+  font-size: 1rem;
+  line-height: 1;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-block;
+}
+
+.theme-toggle-btn:hover .theme-icon {
+  transform: rotate(20deg) scale(1.15);
+}
+
+/* Light theme overrides for toggle btn */
+body.light-theme .theme-toggle-btn {
+  background: rgba(245, 158, 11, 0.12) !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
+  color: #b45309 !important;
+}
+
+body.light-theme .theme-toggle-btn:hover {
+  background: rgba(245, 158, 11, 0.22) !important;
+  border-color: rgba(245, 158, 11, 0.65) !important;
+  color: #92400e !important;
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.25) !important;
 }
 
 .cart-btn {
