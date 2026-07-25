@@ -586,8 +586,31 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
 function closeModalOutside(e,id){if(e.target.id===id)closeModal(id);}
 function showToast(msg,type='success'){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;document.getElementById('toastIcon').textContent=type==='success'?'✓':type==='error'?'✕':'ℹ';t.className='toast '+type+' show';setTimeout(()=>t.classList.remove('show'),3000);}
 
+// THEME SWITCHER SYSTEM
+function initTheme() {
+  const savedTheme = localStorage.getItem('theme');
+  const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+  const isLight = savedTheme === 'light' || (!savedTheme && prefersLight);
+  document.body.classList.toggle('light-theme', isLight);
+  updateThemeUI(isLight);
+}
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light-theme');
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  updateThemeUI(isLight);
+}
+function updateThemeUI(isLight) {
+  document.querySelectorAll('.theme-icon').forEach(icon => {
+    icon.textContent = isLight ? '☀️' : '🌙';
+  });
+  document.querySelectorAll('.theme-label').forEach(label => {
+    label.textContent = isLight ? 'Light Mode' : 'Dark Mode';
+  });
+}
+
 document.addEventListener('DOMContentLoaded',()=>{
   initDB();
+  initTheme();
   const s=DB.session();if(s)startApp(s);
   document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')handleLogin();});
 });

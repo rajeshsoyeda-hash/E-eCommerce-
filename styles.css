@@ -2355,3 +2355,114 @@ header {
   }
 }
 
+/* LIGHT THEME OVERRIDES */
+body.light-theme {
+  --bg: #f3f4f6;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f9fafb;
+  --card-bg: rgba(255, 255, 255, 0.8);
+  --card-glass: rgba(255, 255, 255, 0.9);
+  --card-hover: rgba(255, 255, 255, 0.95);
+  
+  --border: rgba(0, 0, 0, 0.08);
+  --border-focus: rgba(99, 102, 241, 0.6);
+  --border-glow: rgba(99, 102, 241, 0.15);
+
+  --text: #1f2937;
+  --text-muted: #4b5563;
+  --text-dim: #9ca3af;
+
+  --accent-light: rgba(99, 102, 241, 0.08);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.08);
+  --shadow-glow: 0 0 25px rgba(99, 102, 241, 0.08);
+}
+
+/* Specific component overrides for light theme to look premium */
+body.light-theme header {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05), 0 0 20px rgba(99, 102, 241, 0.05);
+}
+
+body.light-theme .auth-box,
+body.light-theme .modal,
+body.light-theme .cart-sidebar {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1), 0 0 30px rgba(99, 102, 241, 0.05);
+}
+
+body.light-theme .product-card,
+body.light-theme .filter-controls-bar,
+body.light-theme .admin-stat,
+body.light-theme .table-wrap,
+body.light-theme .payment-option,
+body.light-theme .auth-tabs,
+body.light-theme .dev-btn-sub {
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: var(--shadow-sm);
+  border-color: var(--border);
+}
+
+body.light-theme .product-card:hover {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08), 0 0 30px rgba(99, 102, 241, 0.15);
+}
+
+body.light-theme .product-img {
+  background: rgba(243, 244, 246, 0.8) !important;
+}
+
+body.light-theme .form-input,
+body.light-theme .form-select,
+body.light-theme .form-textarea,
+body.light-theme .header-search,
+body.light-theme .header-btn,
+body.light-theme .user-chip,
+body.light-theme .auth-tab,
+body.light-theme .cart-close,
+body.light-theme .modal-close {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+body.light-theme .form-input:focus,
+body.light-theme .form-select:focus,
+body.light-theme .form-textarea:focus,
+body.light-theme .header-search:focus-within,
+body.light-theme .header-btn:hover,
+body.light-theme .user-chip:hover,
+body.light-theme .cart-close:hover,
+body.light-theme .modal-close:hover,
+body.light-theme .dev-btn-sub:hover {
+  background: #ffffff;
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+body.light-theme .orders-table th {
+  background: rgba(243, 244, 246, 0.8);
+}
+
+body.light-theme .orders-table tr:hover td {
+  background: rgba(243, 244, 246, 0.5);
+}
+
+body.light-theme .hero-banner {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(243, 244, 246, 0.85));
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.05);
+}
+
+body.light-theme::before {
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.05), transparent 70%);
+}
+body.light-theme::after {
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.03), transparent 70%);
+}
+
+body.light-theme #authScreen {
+  background: radial-gradient(ellipse at 50% 30%, #e0e7ff 0%, #f3f4f6 80%);
+}
+
