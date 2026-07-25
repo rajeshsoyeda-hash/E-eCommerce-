@@ -1976,6 +1976,7 @@ header {
   .form-row-2 {
     grid-template-columns: 1fr;
   }
+}
 /* UTILITIES & ACCESSIBILITY */
 .u-hidden { display: none !important; }
 .page-title { font-size: 1.4rem; font-weight: 900; letter-spacing: -0.03em; margin-bottom: 1.5rem; }
