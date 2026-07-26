@@ -10,8 +10,20 @@ const DB={
 };
 
 const CAT_EMOJI={Electronics:'⚡',Fashion:'👗',Home:'🏠',Books:'📚',Sports:'⚽',Beauty:'💄'};
-const CAT_COLORS={Electronics:{bg:'#eff6ff',color:'#2563eb'},Fashion:{bg:'#fdf4ff',color:'#9333ea'},Home:{bg:'#f0fdf4',color:'#16a34a'},Books:{bg:'#fffbeb',color:'#d97706'},Sports:{bg:'#f0f9ff',color:'#0284c7'},Beauty:{bg:'#fdf2f8',color:'#db2777'}};
-const BADGE_STYLES={NEW:'background:#dcfce7;color:#16a34a',HOT:'background:#fee2e2;color:#dc2626',SALE:'background:#fef3c7;color:#d97706',TOP:'background:#f3e8ff;color:#9333ea'};
+const CAT_COLORS={
+  Electronics:{bg:'rgba(59, 130, 246, 0.15)',color:'#60a5fa'},
+  Fashion:{bg:'rgba(168, 85, 247, 0.15)',color:'#c084fc'},
+  Home:{bg:'rgba(34, 197, 94, 0.15)',color:'#4ade80'},
+  Books:{bg:'rgba(245, 158, 11, 0.15)',color:'#fbbf24'},
+  Sports:{bg:'rgba(14, 165, 233, 0.15)',color:'#38bdf8'},
+  Beauty:{bg:'rgba(236, 72, 153, 0.15)',color:'#f472b6'}
+};
+const BADGE_STYLES={
+  NEW:'background:rgba(34,197,94,0.2);color:#4ade80;border:1px solid rgba(34,197,94,0.4)',
+  HOT:'background:rgba(239,68,68,0.2);color:#f87171;border:1px solid rgba(239,68,68,0.4)',
+  SALE:'background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.4)',
+  TOP:'background:rgba(168,85,247,0.2);color:#c084fc;border:1px solid rgba(168,85,247,0.4)'
+};
 const STATUS_BADGE={Confirmed:'badge-blue',Shipped:'badge-amber',Delivered:'badge-green',Cancelled:'badge-red'};
 
 function initDB(){
