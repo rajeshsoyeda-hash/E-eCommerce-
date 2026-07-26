@@ -57,7 +57,16 @@ function showPage(page){
   if(page==='home')renderFeatured();
   if(page==='products'){selCat='All';renderCategories();renderAllProducts();}
   if(page==='orders')renderOrders();
-  if(page==='admin'){if(currentUser?.role!=='admin'){showToast('Admin access required!','error');showPage('home');return;}renderAdmin();}
+  if(page==='admin'){
+    if(currentUser?.role!=='admin'){
+      showToast('Admin access required!','error');
+      showPage('home');
+      return;
+    }
+    adminOrderFilter = 'All';
+    adminOrderSearch = '';
+    renderAdmin();
+  }
   if(page==='checkout')renderCheckout();
   window.scrollTo(0,0);closeCart();
 }
@@ -431,7 +440,65 @@ function renderCheckout(){
 
 let adminOrderFilter = 'All', adminOrderSearch = '';
 
-function placeOrder(){
+function getTimelineProgress(status) {
+  switch (status) {
+    case 'Pending':
+      return { step: 1, percent: '0%', text: 'Order Placed & Pending Confirmation' };
+    case 'Confirmed':
+      return { step: 2, percent: '33%', text: 'Order Confirmed by Store' };
+    case 'Shipped':
+    case 'Out for Delivery':
+      return { step: 3, percent: '66%', text: 'Order Out for Delivery 🚚' };
+    case 'Delivered':
+      return { step: 4, percent: '100%', text: 'Order Delivered Successfully 🎉' };
+    case 'Cancelled':
+      return { step: 0, percent: '0%', text: 'Order Cancelled ❌' };
+    default:
+      return { step: 1, percent: '0%', text: 'Processing Order' };
+  }
+}
+
+function renderTimelineHTML(status) {
+  const info = getTimelineProgress(status);
+  if (status === 'Cancelled') {
+    return `<div style="padding:1rem;background:var(--rose-light);border:1px solid rgba(244,63,94,0.3);border-radius:var(--r-sm);color:var(--rose);font-weight:700;text-align:center">
+      ❌ Order Status: Cancelled
+    </div>`;
+  }
+  return `
+    <div class="order-tracker-card">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:0.78rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Real-Time Delivery Tracker</span>
+        <span style="font-size:0.85rem;font-weight:800;color:var(--accent)">${info.text}</span>
+      </div>
+      <div class="timeline-tracker">
+        <div class="timeline-progress" style="width: ${info.percent}"></div>
+        
+        <div class="timeline-step ${info.step >= 1 ? (info.step === 1 ? 'active' : 'completed') : ''}">
+          <div class="step-node">${info.step > 1 ? '✓' : '📝'}</div>
+          <div class="step-label">Order Placed</div>
+        </div>
+
+        <div class="timeline-step ${info.step >= 2 ? (info.step === 2 ? 'active' : 'completed') : ''}">
+          <div class="step-node">${info.step > 2 ? '✓' : '⚙️'}</div>
+          <div class="step-label">Confirmed</div>
+        </div>
+
+        <div class="timeline-step ${info.step >= 3 ? (info.step === 3 ? 'active' : 'completed') : ''}">
+          <div class="step-node">${info.step > 3 ? '✓' : '🚚'}</div>
+          <div class="step-label">Out for Delivery</div>
+        </div>
+
+        <div class="timeline-step ${info.step >= 4 ? 'completed active' : ''}">
+          <div class="step-node">${info.step === 4 ? '🎉' : '🎁'}</div>
+          <div class="step-label">Delivered</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function placeOrder(){
   if(!currentUser){
     showToast('Please sign in to place order 🔒','error');
     showPage('home');
@@ -464,15 +531,8 @@ function placeOrder(){
     return;
   }
 
+  // Deduct inventory in DB.products()
   const products = DB.products();
-  for(const item of cart){
-    const prod = products.find(p => p.id === item.productId);
-    if(!prod || prod.stock < item.qty){
-      showToast(`Insufficient stock for ${item.name}! Only ${prod?.stock||0} left.`, 'error');
-      return;
-    }
-  }
-
   for(const item of cart){
     const prod = products.find(p => p.id === item.productId);
     if(prod){
@@ -488,33 +548,66 @@ function placeOrder(){
   const total=Math.max(0, sub - disc + del);
   const pay=document.querySelector('input[name="payment"]:checked')?.value||'UPI';
 
-  const oid='ORD-'+new Date().getFullYear()+'-'+Math.floor(10000+Math.random()*90000);
-  const order={
+  const btn = document.getElementById('placeOrderBtn');
+  const originalText = btn ? btn.innerHTML : 'Place Order →';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '⌛ Processing Order...';
+  }
+
+  const oid='ORD-'+new Date().getFullYear()+'-'+Math.floor(10000000+Math.random()*90000000);
+  const orderPayload={
     id:oid,
+    orderId:oid,
     userId:currentUser.id,
     customerName:name,
     items:cart.map(c=>({productId:c.productId,name:c.name,qty:c.qty,price:c.price,emoji:c.emoji})),
+    cart:cart.map(c=>({productId:c.productId,name:c.name,qty:c.qty,price:c.price,emoji:c.emoji})),
     subtotal:sub,
     discount:disc,
     delivery:del,
     total,
-    status:'Confirmed',
+    status:'Pending',
+    orderStatus:'Pending',
     address:`${addr}, ${document.getElementById('ckCity').value}, ${document.getElementById('ckState').value} - ${pin}`,
     phone:phone,
     payment:pay,
+    paymentMethod:pay,
     date:new Date().toISOString()
   };
 
+  // Try POST to /api/orders (Express server API)
+  try {
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orderPayload)
+    }).catch(() => null);
+
+    if (res && res.ok) {
+      const data = await res.json();
+      console.log('Order created on backend:', data);
+    }
+  } catch (err) {
+    console.warn('Server offline, saving locally in DB.orders()');
+  }
+
+  // Always save locally in DB.orders() for standalone fallback
   const orders=DB.orders();
-  orders.unshift(order);
+  orders.unshift(orderPayload);
   DB.save('orders',orders);
   DB.save('cart',[]);
   DB.save('promo',null);
   updateCartBadge();
 
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+
   document.getElementById('successOrderId').textContent='Order #'+oid;
   showPage('success');
-  showToast('Order confirmed! Stock updated 📦','success');
+  showToast('Order placed successfully! 📦','success');
 }
 
 function renderOrders(){
@@ -538,36 +631,39 @@ function renderOrders(){
     </thead>
     <tbody>
       ${orders.map(o=>`<tr>
-        <td><span style="font-family:var(--font-mono);font-weight:700">${o.id}</span></td>
-        <td>${o.items.map(i=>`${i.emoji||'📦'} ${i.name} (x${i.qty})`).join(', ')}</td>
-        <td style="font-weight:700">₹${o.total.toLocaleString()}</td>
-        <td>${o.payment.toUpperCase()}</td>
-        <td><span class="badge ${STATUS_BADGE[o.status]||'badge-blue'}">${o.status}</span></td>
-        <td style="color:var(--text-muted);font-size:.8rem">${new Date(o.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</td>
-        <td><button class="action-btn" style="background:var(--accent-light);color:var(--accent)" onclick="viewOrderDetails('${o.id}')">👁 Details</button></td>
+        <td><span style="font-family:var(--font-mono);font-weight:700;color:var(--accent)">${o.id || o.orderId}</span></td>
+        <td>${(o.items || o.orderItems || []).map(i=>`${i.emoji||'📦'} ${i.name} (x${i.qty||i.quantity||1})`).join(', ')}</td>
+        <td style="font-weight:700">₹${(o.total || o.totalAmount || 0).toLocaleString()}</td>
+        <td>${(o.payment || o.paymentMethod || 'UPI').toUpperCase()}</td>
+        <td><span class="badge ${STATUS_BADGE[o.status || o.orderStatus]||'badge-blue'}">${o.status || o.orderStatus}</span></td>
+        <td style="color:var(--text-muted);font-size:.8rem">${new Date(o.date || o.createdAt || Date.now()).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</td>
+        <td><button class="action-btn" style="background:var(--accent-light);color:var(--accent)" onclick="viewOrderDetails('${o.id || o.orderId}')">👁 Details</button></td>
       </tr>`).join('')}
     </tbody>
   </table>`;
 }
 
 function viewOrderDetails(id){
-  const o = DB.orders().find(o => o.id === id);
+  const o = DB.orders().find(o => (o.id === id || o.orderId === id));
   if(!o) return;
   const user = DB.users().find(u => u.id === o.userId);
-  const STATUS = ['Confirmed', 'Shipped', 'Delivered', 'Cancelled'];
+  const STATUS = ['Pending', 'Confirmed', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled'];
   const isAdmin = currentUser?.role === 'admin';
+  const currentStatus = o.status || o.orderStatus || 'Pending';
 
   document.getElementById('orderDetailsContent').innerHTML = `
     <div style="margin-bottom:1.25rem">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:1rem;flex-wrap:wrap">
         <div>
           <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Order Number</div>
-          <div style="font-family:var(--font-mono);font-size:1.3rem;font-weight:900;color:var(--accent)">${o.id}</div>
+          <div style="font-family:var(--font-mono);font-size:1.3rem;font-weight:900;color:var(--accent)">${o.id || o.orderId}</div>
         </div>
         <div>
-          <span class="badge ${STATUS_BADGE[o.status]||'badge-blue'}" style="font-size:0.9rem;padding:6px 14px">${o.status}</span>
+          <span class="badge ${STATUS_BADGE[currentStatus]||'badge-blue'}" style="font-size:0.9rem;padding:6px 14px">${currentStatus}</span>
         </div>
       </div>
+
+      ${renderTimelineHTML(currentStatus)}
       
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem">
         <div style="background:var(--bg-secondary);padding:1rem;border-radius:var(--r-sm);border:1px solid var(--border)">
@@ -578,13 +674,13 @@ function viewOrderDetails(id){
         </div>
         <div style="background:var(--bg-secondary);padding:1rem;border-radius:var(--r-sm);border:1px solid var(--border)">
           <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Shipping & Payment</div>
-          <div style="font-size:0.85rem;color:var(--text);font-weight:600">📍 ${o.address}</div>
-          <div style="font-size:0.85rem;color:var(--text-muted);margin-top:4px">💳 Payment: <strong style="color:var(--text)">${o.payment.toUpperCase()}</strong></div>
-          <div style="font-size:0.8rem;color:var(--text-dim);margin-top:2px">📅 ${new Date(o.date).toLocaleString('en-IN')}</div>
+          <div style="font-size:0.85rem;color:var(--text);font-weight:600">📍 ${o.address || o.shippingAddress?.fullAddress || ''}</div>
+          <div style="font-size:0.85rem;color:var(--text-muted);margin-top:4px">💳 Payment: <strong style="color:var(--text)">${(o.payment || o.paymentMethod || 'UPI').toUpperCase()}</strong></div>
+          <div style="font-size:0.8rem;color:var(--text-dim);margin-top:2px">📅 ${new Date(o.date || o.createdAt || Date.now()).toLocaleString('en-IN')}</div>
         </div>
       </div>
 
-      <div style="font-size:0.85rem;font-weight:800;color:var(--text);margin-bottom:0.6rem">Ordered Items (${o.items.reduce((s,i)=>s+i.qty,0)})</div>
+      <div style="font-size:0.85rem;font-weight:800;color:var(--text);margin-bottom:0.6rem">Ordered Items (${(o.items || o.orderItems || []).reduce((s,i)=>s+(i.qty||i.quantity||1),0)})</div>
       <div class="table-wrap" style="margin-bottom:1.25rem">
         <table class="data-table">
           <thead>
@@ -596,32 +692,32 @@ function viewOrderDetails(id){
             </tr>
           </thead>
           <tbody>
-            ${o.items.map(i=>`<tr>
+            ${(o.items || o.orderItems || []).map(i=>`<tr>
               <td><span style="font-size:1.1rem">${i.emoji||'📦'}</span> <strong>${i.name}</strong></td>
-              <td>x${i.qty}</td>
+              <td>x${i.qty||i.quantity||1}</td>
               <td>₹${i.price.toLocaleString()}</td>
-              <td style="font-weight:700">₹${(i.price * i.qty).toLocaleString()}</td>
+              <td style="font-weight:700">₹${(i.price * (i.qty||i.quantity||1)).toLocaleString()}</td>
             </tr>`).join('')}
           </tbody>
         </table>
       </div>
 
       <div style="background:var(--bg-secondary);padding:1rem;border-radius:var(--r-sm);border:1px solid var(--border)">
-        <div style="display:flex;justify-content:space-between;font-size:0.88rem;color:var(--text-muted);padding:3px 0"><span>Subtotal</span><span>₹${(o.subtotal||o.total).toLocaleString()}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:0.88rem;color:var(--text-muted);padding:3px 0"><span>Subtotal</span><span>₹${(o.subtotal||o.total||o.totalAmount).toLocaleString()}</span></div>
         ${o.discount ? `<div style="display:flex;justify-content:space-between;font-size:0.88rem;color:var(--emerald);font-weight:700;padding:3px 0"><span>Promo Discount</span><span>−₹${o.discount.toLocaleString()}</span></div>` : ''}
-        <div style="display:flex;justify-content:space-between;font-size:0.88rem;color:var(--text-muted);padding:3px 0"><span>Delivery Charge</span><span>${o.delivery===0?'<strong style="color:var(--emerald)">FREE</strong>':'₹'+o.delivery}</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:1.1rem;font-weight:900;color:var(--text);border-top:1px solid var(--border);padding-top:8px;margin-top:4px"><span>Order Total</span><span>₹${o.total.toLocaleString()}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:0.88rem;color:var(--text-muted);padding:3px 0"><span>Delivery Charge</span><span>${o.delivery===0?'<strong style="color:var(--emerald)">FREE</strong>':'₹'+(o.delivery||0)}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:1.1rem;font-weight:900;color:var(--text);border-top:1px solid var(--border);padding-top:8px;margin-top:4px"><span>Order Total</span><span>₹${(o.total || o.totalAmount || 0).toLocaleString()}</span></div>
       </div>
 
       ${isAdmin ? `
-      <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px dashed var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px">
-        <div style="display:flex;align-items:center;gap:10px">
-          <label style="font-size:0.82rem;font-weight:700;color:var(--text-muted)">Update Status:</label>
-          <select onchange="updateOrderStatus('${o.id}',this.value);viewOrderDetails('${o.id}')" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);font-family:var(--font-body);font-size:0.88rem;background:var(--bg-tertiary);color:var(--text);font-weight:700">
-            ${STATUS.map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}
-          </select>
+      <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px dashed var(--border);display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:0.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase">Quick Admin Actions:</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <button class="action-btn" style="background:var(--accent-light);color:var(--accent);padding:6px 12px;font-weight:700" onclick="updateOrderStatus('${o.id || o.orderId}','Confirmed');viewOrderDetails('${o.id || o.orderId}')">✓ Confirm</button>
+          <button class="action-btn" style="background:var(--amber-light);color:var(--amber);padding:6px 12px;font-weight:700" onclick="updateOrderStatus('${o.id || o.orderId}','Out for Delivery');viewOrderDetails('${o.id || o.orderId}')">🚚 Out for Delivery</button>
+          <button class="action-btn" style="background:var(--emerald-light);color:var(--emerald);padding:6px 12px;font-weight:700" onclick="updateOrderStatus('${o.id || o.orderId}','Delivered');viewOrderDetails('${o.id || o.orderId}')">✅ Delivered</button>
+          <button class="action-btn" style="background:var(--rose-light);color:var(--rose);padding:6px 12px;margin-left:auto" onclick="deleteOrder('${o.id || o.orderId}');closeModal('orderDetailsModal')">🗑 Delete Order</button>
         </div>
-        <button class="action-btn" style="background:var(--rose-light);color:var(--rose);padding:8px 16px" onclick="deleteOrder('${o.id}');closeModal('orderDetailsModal')">🗑 Delete Order</button>
       </div>` : ''}
     </div>
   `;
@@ -663,6 +759,82 @@ function quickRestockProduct(id, amount=10){
   DB.save('products', prods);
   renderAdmin();
   showToast(`Restocked ${p.name} (+${amount} units) 📦`, 'success');
+}
+
+function openAdminOrderModal(){
+  const users = DB.users();
+  const products = DB.products();
+  
+  if(!products.length){
+    showToast('No products available to order!','error');
+    return;
+  }
+
+  const uSelect = document.getElementById('aoUser');
+  uSelect.innerHTML = users.map(u => `<option value="${u.id}">${u.name} (${u.email})</option>`).join('');
+
+  const pSelect = document.getElementById('aoProduct');
+  pSelect.innerHTML = products.map(p => `<option value="${p.id}">${p.emoji||'📦'} ${p.name} — ₹${p.price.toLocaleString()} (${p.stock} in stock)</option>`).join('');
+
+  document.getElementById('aoQty').value = 1;
+  document.getElementById('aoPhone').value = currentUser?.phone || '9876543210';
+  document.getElementById('aoAddress').value = 'Bhopal, Madhya Pradesh - 462001';
+  openModal('adminOrderModal');
+}
+
+function saveAdminOrder(){
+  const userId = parseInt(document.getElementById('aoUser').value);
+  const prodId = parseInt(document.getElementById('aoProduct').value);
+  const qty = parseInt(document.getElementById('aoQty').value) || 1;
+  const pay = document.getElementById('aoPayment').value;
+  const phone = document.getElementById('aoPhone').value.trim();
+  const addr = document.getElementById('aoAddress').value.trim();
+
+  if(!userId || !prodId || !phone || !addr){
+    showToast('Fill all order details!','error');
+    return;
+  }
+
+  const user = DB.users().find(u => u.id === userId);
+  const products = DB.products();
+  const prod = products.find(p => p.id === prodId);
+
+  if(!prod || prod.stock < qty){
+    showToast(`Insufficient stock! Only ${prod?.stock||0} available.`, 'error');
+    return;
+  }
+
+  prod.stock -= qty;
+  DB.save('products', products);
+
+  const sub = prod.price * qty;
+  const del = sub < 499 ? 40 : 0;
+  const total = sub + del;
+  const oid = 'ORD-' + new Date().getFullYear() + '-' + Math.floor(10000 + Math.random() * 90000);
+
+  const order = {
+    id: oid,
+    userId: user.id,
+    customerName: user.name,
+    items: [{ productId: prod.id, name: prod.name, qty: qty, price: prod.price, emoji: prod.emoji }],
+    subtotal: sub,
+    discount: 0,
+    delivery: del,
+    total: total,
+    status: 'Confirmed',
+    address: addr,
+    phone: phone,
+    payment: pay,
+    date: new Date().toISOString()
+  };
+
+  const orders = DB.orders();
+  orders.unshift(order);
+  DB.save('orders', orders);
+
+  closeModal('adminOrderModal');
+  renderAdmin();
+  showToast(`Order #${oid} created & placed for ${user.name}! 📦`, 'success');
 }
 
 function openUserModal(){
@@ -733,7 +905,7 @@ function renderAdminTab(tab){
       </table>
     </div>`;
   } else if(tab==='orders'){
-    const STATUS=['Confirmed','Shipped','Delivered','Cancelled'];
+    const STATUS=['Confirmed','Shipped','Out for Delivery','Delivered','Cancelled'];
     let orders = DB.orders();
     if(adminOrderFilter !== 'All') {
       orders = orders.filter(o => o.status === adminOrderFilter);
@@ -754,16 +926,21 @@ function renderAdminTab(tab){
           <option value="All" ${adminOrderFilter==='All'?'selected':''}>All Orders (${DB.orders().length})</option>
           ${STATUS.map(s=>`<option value="${s}" ${adminOrderFilter===s?'selected':''}>${s} (${DB.orders().filter(o=>o.status===s).length})</option>`).join('')}
         </select>
+        ${(adminOrderFilter !== 'All' || adminOrderSearch !== '') ? `<button class="action-btn" style="background:var(--rose-light);color:var(--rose);padding:6px 12px;font-weight:700" onclick="adminOrderFilter='All';adminOrderSearch='';renderAdmin()">✕ Clear Filters</button>` : ''}
       </div>
-      <div style="flex:1;max-width:320px;display:flex;align-items:center;gap:8px;background:var(--bg-tertiary);padding:4px 12px;border-radius:8px;border:1px solid var(--border)">
+      <div style="flex:1;max-width:340px;display:flex;align-items:center;gap:8px;background:var(--bg-tertiary);padding:4px 12px;border-radius:8px;border:1px solid var(--border)">
         <span style="font-size:0.85rem">🔍</span>
-        <input type="text" placeholder="Search by Order ID, Name, Phone..." value="${adminOrderSearch}" oninput="handleAdminOrderSearch(this.value)" style="background:transparent;border:none;outline:none;color:var(--text);font-size:0.85rem;width:100%">
+        <input type="text" placeholder="Search Order ID, Name, Phone..." value="${adminOrderSearch}" oninput="handleAdminOrderSearch(this.value)" style="background:transparent;border:none;outline:none;color:var(--text);font-size:0.85rem;width:100%">
       </div>
     </div>
 
     <div class="table-wrap">
       <div class="table-head">
         <div class="table-head-title">Customer Orders (${orders.length})</div>
+        <div style="display:flex;gap:8px">
+          <button class="action-btn" style="background:var(--bg-tertiary);color:var(--text);padding:8px 14px;border:1px solid var(--border);font-weight:700" onclick="renderAdmin()">🔄 Refresh Orders</button>
+          <button class="action-btn" style="background:var(--accent);color:#fff;padding:8px 16px;font-weight:700" onclick="openAdminOrderModal()">+ Create Manual Order</button>
+        </div>
       </div>
       <table class="data-table">
         <thead>
@@ -799,7 +976,9 @@ function renderAdminTab(tab){
               </td>
               <td style="color:var(--text-muted);font-size:.8rem">${new Date(o.date).toLocaleDateString('en-IN')}</td>
               <td>
-                <button class="action-btn" style="background:var(--accent-light);color:var(--accent);margin-right:6px" onclick="viewOrderDetails('${o.id}')">👁 Details</button>
+                <button class="action-btn" style="background:var(--accent-light);color:var(--accent);margin-right:4px" onclick="viewOrderDetails('${o.id}')">👁 Details</button>
+                ${o.status === 'Confirmed' ? `<button class="action-btn" style="background:var(--amber-light);color:var(--amber);margin-right:4px;font-weight:700" onclick="updateOrderStatus('${o.id}','Out for Delivery')">🚚 Out for Delivery</button>` : ''}
+                ${o.status === 'Out for Delivery' || o.status === 'Shipped' ? `<button class="action-btn" style="background:var(--emerald-light);color:var(--emerald);margin-right:4px;font-weight:700" onclick="updateOrderStatus('${o.id}','Delivered')">✅ Mark Delivered</button>` : ''}
                 <button class="action-btn" style="background:var(--rose-light);color:var(--rose)" onclick="deleteOrder('${o.id}')">🗑</button>
               </td>
             </tr>`;
@@ -830,13 +1009,32 @@ function renderAdminTab(tab){
     </div>`;
   }
 }
-function updateOrderStatus(id,status){
-  const orders=DB.orders(),o=orders.find(o=>o.id===id);
-  if(o) o.status=status;
-  DB.save('orders',orders);
-  if(currentPage==='admin') renderAdmin();
-  if(currentPage==='orders') renderOrders();
-  showToast('Order '+id+' status updated → '+status,'success');
+async function updateOrderStatus(id, status){
+  const orders = DB.orders();
+  const o = orders.find(o => (o.id === id || o.orderId === id));
+  if (o) {
+    o.status = status;
+    o.orderStatus = status;
+    DB.save('orders', orders);
+  }
+
+  try {
+    const token = localStorage.getItem('token') || localStorage.getItem('ss_token');
+    await fetch(`/api/admin/orders/${id}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ orderStatus: status })
+    }).catch(() => null);
+  } catch (err) {
+    console.warn('Backend API update skipped (using local sync)');
+  }
+
+  if (currentPage === 'admin') renderAdmin();
+  if (currentPage === 'orders') renderOrders();
+  showToast(`Order ${id} updated → "${status}"`, 'success');
 }
 function deleteOrder(id){
   DB.save('orders',DB.orders().filter(o=>o.id!==id));

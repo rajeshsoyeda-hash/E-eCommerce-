@@ -2050,6 +2050,101 @@ body.light-theme .hero-banner {
   border: 1px solid rgba(139, 92, 246, 0.2);
 }
 
+/* ORDER STATUS VISUAL TIMELINE TRACKER */
+.order-tracker-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.timeline-tracker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  margin: 1.5rem 0 0.5rem;
+  padding: 0 10px;
+}
+
+.timeline-tracker::before {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: 40px;
+  right: 40px;
+  height: 3px;
+  background: var(--border);
+  z-index: 1;
+}
+
+.timeline-progress {
+  position: absolute;
+  top: 20px;
+  left: 40px;
+  height: 3px;
+  background: var(--accent-gradient);
+  z-index: 1;
+  transition: width 0.4s ease;
+}
+
+.timeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+}
+
+.step-node {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  border: 2px solid var(--border);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 800;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.timeline-step.completed .step-node {
+  background: var(--emerald-light);
+  border-color: var(--emerald);
+  color: var(--emerald);
+}
+
+.timeline-step.active .step-node {
+  background: var(--accent-gradient);
+  border-color: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.4);
+  transform: scale(1.15);
+}
+
+.step-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-top: 8px;
+  text-align: center;
+}
+
+.timeline-step.active .step-label {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.timeline-step.completed .step-label {
+  color: var(--emerald);
+}
+
 /* RESPONSIVE */
 @media (max-width: 900px) {
   .header-top {

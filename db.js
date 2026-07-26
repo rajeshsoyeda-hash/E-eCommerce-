@@ -24,7 +24,7 @@ const BADGE_STYLES={
   SALE:'background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.4)',
   TOP:'background:rgba(168,85,247,0.2);color:#c084fc;border:1px solid rgba(168,85,247,0.4)'
 };
-const STATUS_BADGE={Confirmed:'badge-blue',Shipped:'badge-amber',Delivered:'badge-green',Cancelled:'badge-red'};
+const STATUS_BADGE={Confirmed:'badge-blue',Shipped:'badge-purple','Out for Delivery':'badge-amber',Delivered:'badge-green',Cancelled:'badge-red'};
 
 function initDB(){
   if(!DB.users().length) DB.save('users',[{id:1,name:'Rajesh Soyeda',email:'user@shop.com',password:'user123',role:'user'},{id:2,name:'Admin User',email:'admin@shop.com',password:'admin123',role:'admin'}]);
