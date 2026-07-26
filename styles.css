@@ -1,19 +1,19 @@
 :root {
-  /* 🌙 Dark Theme — DEFAULT */
-  --bg: #0a0a14;
-  --bg-secondary: #0f0f1e;
-  --bg-tertiary: #13131f;
-  --card-bg: rgba(18, 18, 35, 0.9);
-  --card-glass: rgba(20, 20, 40, 0.75);
-  --card-hover: rgba(25, 25, 48, 0.98);
+  /* 🌙 Dark Theme — DEEP MIDNIGHT DEFAULT */
+  --bg: #070711;
+  --bg-secondary: #0d0d1b;
+  --bg-tertiary: #121224;
+  --card-bg: rgba(14, 14, 28, 0.88);
+  --card-glass: rgba(16, 16, 32, 0.75);
+  --card-hover: rgba(22, 22, 44, 0.95);
 
-  --border: rgba(99, 102, 241, 0.18);
-  --border-focus: rgba(99, 102, 241, 0.55);
-  --border-glow: rgba(99, 102, 241, 0.3);
+  --border: rgba(255, 255, 255, 0.1);
+  --border-focus: rgba(99, 102, 241, 0.6);
+  --border-glow: rgba(99, 102, 241, 0.25);
 
-  --text: #f1f5f9;
+  --text: #f8fafc;
   --text-muted: #94a3b8;
-  --text-dim: #475569;
+  --text-dim: #64748b;
 
   /* Accent & Gradients */
   --accent: #818cf8;
@@ -39,8 +39,8 @@
   --r-sm: 8px;
   --r-md: 14px;
   --r-lg: 24px;
-  --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.6);
   --shadow-glow: 0 0 30px rgba(99, 102, 241, 0.25);
   --backdrop: blur(16px) saturate(180%);
 }
@@ -144,7 +144,7 @@ h1, h2, h3, .brand, .hero-title, .section-title, .modal-title {
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  background: radial-gradient(ellipse at 50% 30%, #1a1a3e 0%, #0a0a14 80%);
+  background: radial-gradient(ellipse at 50% 30%, #101026 0%, #06060e 80%);
   position: relative;
   overflow: hidden;
 }
@@ -626,7 +626,7 @@ body.light-theme .theme-toggle-btn:hover {
 
 /* HERO BANNER */
 .hero-banner {
-  background: linear-gradient(135deg, #1a1a3e 0%, #13132e 60%, #1e1030 100%);
+  background: linear-gradient(135deg, #121228 0%, #0a0a18 60%, #140a22 100%);
   -webkit-backdrop-filter: var(--backdrop);
   backdrop-filter: var(--backdrop);
   border: 1px solid var(--border);
