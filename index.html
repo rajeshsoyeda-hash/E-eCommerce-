@@ -54,7 +54,7 @@
         <button class="header-btn theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" aria-label="Toggle Theme" title="Toggle Theme">
           <span class="theme-icon">🌙</span> <span class="theme-label">Dark Mode</span>
         </button>
-        <div class="user-chip" onclick="showPage('orders')">
+        <div class="user-chip" onclick="handleUserChipClick()" title="Profile & Account">
           <div class="user-chip-avatar" id="headerAvatar">R</div>
           <div class="user-chip-name" id="headerName">Rajesh</div>
           <span class="admin-tag u-hidden" id="headerRole">ADMIN</span>
@@ -68,7 +68,7 @@
       <div class="nav-link" onclick="showPage('products')">📦 Products</div>
       <div class="nav-link" onclick="showPage('orders')">📋 My Orders</div>
       <div class="nav-link" onclick="openDevModal()">👨‍💻 Developer</div>
-      <div class="nav-link u-hidden" id="adminNavLink" onclick="showPage('admin')">🛡 Admin</div>
+      <div class="nav-link u-hidden" id="adminNavLink" onclick="handleAdminButtonClick()" role="button" aria-label="Admin Panel">🛡 Admin</div>
     </div>
   </header>
   <!-- HOME -->

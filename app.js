@@ -67,17 +67,72 @@ function showPage(page){
   if(page==='products'){selCat='All';renderCategories();renderAllProducts();}
   if(page==='orders')renderOrders();
   if(page==='admin'){
-    if(currentUser?.role!=='admin'){
-      showToast('Admin access required!','error');
+    if(!currentUser || currentUser.role!=='admin'){
+      showToast('Access Denied: Admin role required! 🔒','error');
       showPage('home');
       return;
     }
+    adminTab = 'orders';
     adminOrderFilter = 'All';
     adminOrderSearch = '';
-    renderAdmin();
+    fetchAdminOrdersAndRender();
   }
   if(page==='checkout')renderCheckout();
   window.scrollTo(0,0);closeCart();
+}
+
+function handleAdminButtonClick() {
+  if (!currentUser) {
+    showToast('Please sign in as Admin to access Admin Panel 🔒', 'error');
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('appScreen').style.display = 'none';
+    return;
+  }
+  if (currentUser.role !== 'admin') {
+    showToast('Access Denied: Admin role required! ⛔', 'error');
+    showPage('home');
+    return;
+  }
+  showPage('admin');
+}
+
+function handleUserChipClick() {
+  if (currentUser?.role === 'admin') {
+    handleAdminButtonClick();
+  } else {
+    showPage('orders');
+  }
+}
+
+async function fetchAdminOrdersAndRender() {
+  try {
+    const token = localStorage.getItem('token') || localStorage.getItem('ss_token');
+    const res = await fetch('/api/admin/orders', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    }).catch(() => null);
+
+    if (res && res.ok) {
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.data)) {
+        const localOrders = DB.orders();
+        data.data.forEach(serverOrder => {
+          const oid = serverOrder.orderId || serverOrder.id || serverOrder._id;
+          const idx = localOrders.findIndex(o => (o.id === oid || o.orderId === oid));
+          if (idx !== -1) {
+            localOrders[idx] = { ...localOrders[idx], ...serverOrder, id: oid, status: serverOrder.orderStatus };
+          } else {
+            localOrders.unshift({ ...serverOrder, id: oid, status: serverOrder.orderStatus });
+          }
+        });
+        DB.save('orders', localOrders);
+      }
+    }
+  } catch (err) {
+    console.warn('Backend GET /api/admin/orders fetch skipped (using local state)');
+  }
+  renderAdmin();
 }
 
 // SKELETON LOADERS
