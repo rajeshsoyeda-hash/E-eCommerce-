@@ -425,10 +425,12 @@ function renderCheckout(){
   document.getElementById('checkoutSummary').innerHTML=`
     <div class="summary-row"><span>Subtotal</span><span>₹${sub.toLocaleString()}</span></div>
     ${disc>0?`<div class="summary-row discount-row" style="color:var(--emerald)"><span>Discount (${activePromo.code})</span><span>−₹${disc.toLocaleString()}</span></div>`:''}
-    <div class="summary-row"><span>Delivery</span><span>${del===0?'FREE':'₹'+del}</span></div>
     <div class="summary-row total"><span>Total</span><span>₹${total.toLocaleString()}</span></div>`;
   document.getElementById('ckName').value=currentUser?.name||'';
 }
+
+let adminOrderFilter = 'All', adminOrderSearch = '';
+
 function placeOrder(){
   if(!currentUser){
     showToast('Please sign in to place order 🔒','error');
@@ -445,14 +447,12 @@ function placeOrder(){
     return;
   }
 
-  // Validate Phone (at least 10 digits)
   const cleanPhone = phone.replace(/[^0-9]/g, '');
   if(cleanPhone.length < 10){
     showToast('Enter a valid 10-digit phone number!','error');
     return;
   }
 
-  // Validate PIN code (6 digits)
   if(!/^\d{6}$/.test(pin)){
     showToast('Enter a valid 6-digit PIN Code!','error');
     return;
@@ -464,7 +464,6 @@ function placeOrder(){
     return;
   }
 
-  // Stock Check & Real-time Deduction
   const products = DB.products();
   for(const item of cart){
     const prod = products.find(p => p.id === item.productId);
@@ -474,7 +473,6 @@ function placeOrder(){
     }
   }
 
-  // Deduct Inventory in DB.products()
   for(const item of cart){
     const prod = products.find(p => p.id === item.productId);
     if(prod){
@@ -483,7 +481,6 @@ function placeOrder(){
   }
   DB.save('products', products);
 
-  // Calculate Order Total
   const sub=cart.reduce((s,c)=>s+c.price*c.qty,0);
   const activePromo=DB.promo();
   const disc=activePromo ? Math.round(sub*(activePromo.percent/100)) : 0;
@@ -495,7 +492,8 @@ function placeOrder(){
   const order={
     id:oid,
     userId:currentUser.id,
-    items:cart.map(c=>({productId:c.productId,name:c.name,qty:c.qty,price:c.price})),
+    customerName:name,
+    items:cart.map(c=>({productId:c.productId,name:c.name,qty:c.qty,price:c.price,emoji:c.emoji})),
     subtotal:sub,
     discount:disc,
     delivery:del,
@@ -518,11 +516,116 @@ function placeOrder(){
   showPage('success');
   showToast('Order confirmed! Stock updated 📦','success');
 }
+
 function renderOrders(){
   const orders=DB.orders().filter(o=>o.userId===currentUser?.id);
   const el=document.getElementById('ordersContent');
-  if(!orders.length){el.innerHTML=`<div style="text-align:center;padding:3rem;color:var(--text-muted)"><div style="font-size:3rem;margin-bottom:1rem">📦</div><div style="font-weight:700;margin-bottom:.5rem">No orders yet</div><button class="btn-primary" style="max-width:200px;margin:1rem auto 0;display:flex" onclick="showPage('products')">Shop Now →</button></div>`;return;}
-  el.innerHTML=`<table class="orders-table"><thead><tr><th>Order ID</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th>Date</th></tr></thead><tbody>${orders.map(o=>`<tr><td><span style="font-family:var(--font-mono);font-weight:700">${o.id}</span></td><td>${o.items.map(i=>i.name).join(', ')}</td><td style="font-weight:700">₹${o.total.toLocaleString()}</td><td>${o.payment}</td><td><span class="badge ${STATUS_BADGE[o.status]||'badge-blue'}">${o.status}</span></td><td style="color:var(--text-muted);font-size:.8rem">${new Date(o.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</td></tr>`).join('')}</tbody></table>`;
+  if(!orders.length){
+    el.innerHTML=`<div style="text-align:center;padding:3rem;color:var(--text-muted)"><div style="font-size:3rem;margin-bottom:1rem">📦</div><div style="font-weight:700;margin-bottom:.5rem">No orders placed yet</div><button class="btn-primary" style="max-width:200px;margin:1rem auto 0;display:flex" onclick="showPage('products')">Shop Now →</button></div>`;
+    return;
+  }
+  el.innerHTML=`<table class="orders-table">
+    <thead>
+      <tr>
+        <th>Order ID</th>
+        <th>Items</th>
+        <th>Total</th>
+        <th>Payment</th>
+        <th>Status</th>
+        <th>Date</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${orders.map(o=>`<tr>
+        <td><span style="font-family:var(--font-mono);font-weight:700">${o.id}</span></td>
+        <td>${o.items.map(i=>`${i.emoji||'📦'} ${i.name} (x${i.qty})`).join(', ')}</td>
+        <td style="font-weight:700">₹${o.total.toLocaleString()}</td>
+        <td>${o.payment.toUpperCase()}</td>
+        <td><span class="badge ${STATUS_BADGE[o.status]||'badge-blue'}">${o.status}</span></td>
+        <td style="color:var(--text-muted);font-size:.8rem">${new Date(o.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</td>
+        <td><button class="action-btn" style="background:var(--accent-light);color:var(--accent)" onclick="viewOrderDetails('${o.id}')">👁 Details</button></td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+function viewOrderDetails(id){
+  const o = DB.orders().find(o => o.id === id);
+  if(!o) return;
+  const user = DB.users().find(u => u.id === o.userId);
+  const STATUS = ['Confirmed', 'Shipped', 'Delivered', 'Cancelled'];
+  const isAdmin = currentUser?.role === 'admin';
+
+  document.getElementById('orderDetailsContent').innerHTML = `
+    <div style="margin-bottom:1.25rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:1rem;flex-wrap:wrap">
+        <div>
+          <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Order Number</div>
+          <div style="font-family:var(--font-mono);font-size:1.3rem;font-weight:900;color:var(--accent)">${o.id}</div>
+        </div>
+        <div>
+          <span class="badge ${STATUS_BADGE[o.status]||'badge-blue'}" style="font-size:0.9rem;padding:6px 14px">${o.status}</span>
+        </div>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem">
+        <div style="background:var(--bg-secondary);padding:1rem;border-radius:var(--r-sm);border:1px solid var(--border)">
+          <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Customer Info</div>
+          <div style="font-weight:800;color:var(--text)">👤 ${o.customerName || user?.name || 'Customer'}</div>
+          <div style="font-size:0.85rem;color:var(--text-muted);margin-top:2px">📞 ${o.phone || 'N/A'}</div>
+          <div style="font-size:0.85rem;color:var(--text-muted);margin-top:2px">✉️ ${user?.email || 'N/A'}</div>
+        </div>
+        <div style="background:var(--bg-secondary);padding:1rem;border-radius:var(--r-sm);border:1px solid var(--border)">
+          <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Shipping & Payment</div>
+          <div style="font-size:0.85rem;color:var(--text);font-weight:600">📍 ${o.address}</div>
+          <div style="font-size:0.85rem;color:var(--text-muted);margin-top:4px">💳 Payment: <strong style="color:var(--text)">${o.payment.toUpperCase()}</strong></div>
+          <div style="font-size:0.8rem;color:var(--text-dim);margin-top:2px">📅 ${new Date(o.date).toLocaleString('en-IN')}</div>
+        </div>
+      </div>
+
+      <div style="font-size:0.85rem;font-weight:800;color:var(--text);margin-bottom:0.6rem">Ordered Items (${o.items.reduce((s,i)=>s+i.qty,0)})</div>
+      <div class="table-wrap" style="margin-bottom:1.25rem">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Qty</th>
+              <th>Price</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${o.items.map(i=>`<tr>
+              <td><span style="font-size:1.1rem">${i.emoji||'📦'}</span> <strong>${i.name}</strong></td>
+              <td>x${i.qty}</td>
+              <td>₹${i.price.toLocaleString()}</td>
+              <td style="font-weight:700">₹${(i.price * i.qty).toLocaleString()}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="background:var(--bg-secondary);padding:1rem;border-radius:var(--r-sm);border:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;font-size:0.88rem;color:var(--text-muted);padding:3px 0"><span>Subtotal</span><span>₹${(o.subtotal||o.total).toLocaleString()}</span></div>
+        ${o.discount ? `<div style="display:flex;justify-content:space-between;font-size:0.88rem;color:var(--emerald);font-weight:700;padding:3px 0"><span>Promo Discount</span><span>−₹${o.discount.toLocaleString()}</span></div>` : ''}
+        <div style="display:flex;justify-content:space-between;font-size:0.88rem;color:var(--text-muted);padding:3px 0"><span>Delivery Charge</span><span>${o.delivery===0?'<strong style="color:var(--emerald)">FREE</strong>':'₹'+o.delivery}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:1.1rem;font-weight:900;color:var(--text);border-top:1px solid var(--border);padding-top:8px;margin-top:4px"><span>Order Total</span><span>₹${o.total.toLocaleString()}</span></div>
+      </div>
+
+      ${isAdmin ? `
+      <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px dashed var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <label style="font-size:0.82rem;font-weight:700;color:var(--text-muted)">Update Status:</label>
+          <select onchange="updateOrderStatus('${o.id}',this.value);viewOrderDetails('${o.id}')" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);font-family:var(--font-body);font-size:0.88rem;background:var(--bg-tertiary);color:var(--text);font-weight:700">
+            ${STATUS.map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <button class="action-btn" style="background:var(--rose-light);color:var(--rose);padding:8px 16px" onclick="deleteOrder('${o.id}');closeModal('orderDetailsModal')">🗑 Delete Order</button>
+      </div>` : ''}
+    </div>
+  `;
+  openModal('orderDetailsModal');
 }
 
 // ADMIN
@@ -534,27 +637,221 @@ function renderAdmin(){
   document.getElementById('adminRevenue').textContent='₹'+orders.reduce((s,o)=>s+o.total,0).toLocaleString();
   renderAdminTab(adminTab);
 }
-function switchAdminTab(tab,el){adminTab=tab;document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderAdminTab(tab);}
+
+function switchAdminTab(tab,el){
+  adminTab=tab;
+  document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  renderAdminTab(tab);
+}
+
+function handleAdminOrderFilter(val){
+  adminOrderFilter=val;
+  renderAdminTab('orders');
+}
+
+function handleAdminOrderSearch(val){
+  adminOrderSearch=val.toLowerCase().trim();
+  renderAdminTab('orders');
+}
+
+function quickRestockProduct(id, amount=10){
+  const prods = DB.products();
+  const p = prods.find(p => p.id === id);
+  if(!p) return;
+  p.stock += amount;
+  DB.save('products', prods);
+  renderAdmin();
+  showToast(`Restocked ${p.name} (+${amount} units) 📦`, 'success');
+}
+
+function openUserModal(){
+  document.getElementById('uName').value='';
+  document.getElementById('uEmail').value='';
+  document.getElementById('uPass').value='';
+  document.getElementById('uRole').value='user';
+  openModal('userModal');
+}
+
+function saveUser(){
+  const name=document.getElementById('uName').value.trim();
+  const email=document.getElementById('uEmail').value.trim();
+  const pass=document.getElementById('uPass').value.trim();
+  const role=document.getElementById('uRole').value;
+  if(!name||!email||!pass){
+    showToast('Name, Email and Password required!','error');
+    return;
+  }
+  const users=DB.users();
+  if(users.find(u=>u.email===email)){
+    showToast('User email already exists!','error');
+    return;
+  }
+  users.push({id:Date.now(),name,email,password:pass,role});
+  DB.save('users',users);
+  closeModal('userModal');
+  renderAdmin();
+  showToast(`User ${name} created successfully!`, 'success');
+}
+
+function deleteUser(id){
+  if(id === currentUser.id){
+    showToast('Cannot delete yourself!','error');
+    return;
+  }
+  const users = DB.users().filter(u => u.id !== id);
+  DB.save('users', users);
+  renderAdmin();
+  showToast('User account deleted.', 'error');
+}
+
 function renderAdminTab(tab){
   const el=document.getElementById('adminContent');
   if(tab==='products'){
-    el.innerHTML=`<div class="table-wrap"><div class="table-head"><div class="table-head-title">Products (${DB.products().length})</div><button class="action-btn" style="background:var(--accent);color:#fff;padding:8px 16px" onclick="openProductModal()">+ Add Product</button></div>
-    <table class="data-table"><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Actions</th></tr></thead>
-    <tbody>${DB.products().map(p=>`<tr><td><span style="font-size:1.2rem">${p.emoji}</span> <strong>${p.name}</strong></td><td><span class="badge" style="background:${CAT_COLORS[p.category]?.bg||'rgba(99,102,241,0.1)'};color:${CAT_COLORS[p.category]?.color||'var(--accent)'}">${p.category}</span></td><td style="font-weight:700">₹${p.price.toLocaleString()}</td><td><span style="color:${p.stock<10?'var(--rose)':'var(--emerald)'}">${p.stock}</span></td><td><button class="action-btn" style="background:var(--accent-light);color:var(--accent);margin-right:6px" onclick="editProduct(${p.id})">Edit</button><button class="action-btn" style="background:var(--rose-light);color:var(--rose)" onclick="deleteProduct(${p.id})">Delete</button></td></tr>`).join('')}</tbody></table></div>`;
+    el.innerHTML=`<div class="table-wrap">
+      <div class="table-head">
+        <div class="table-head-title">Products Inventory (${DB.products().length})</div>
+        <button class="action-btn" style="background:var(--accent);color:#fff;padding:8px 16px;font-weight:700" onclick="openProductModal()">+ Add Product</button>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock Level</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${DB.products().map(p=>`<tr>
+            <td><span style="font-size:1.2rem">${p.emoji}</span> <strong>${p.name}</strong></td>
+            <td><span class="badge" style="background:${CAT_COLORS[p.category]?.bg||'rgba(99,102,241,0.1)'};color:${CAT_COLORS[p.category]?.color||'var(--accent)'}">${p.category}</span></td>
+            <td style="font-weight:700">₹${p.price.toLocaleString()}</td>
+            <td>
+              <span style="font-weight:700;color:${p.stock===0?'var(--rose)':(p.stock<10?'var(--amber)':'var(--emerald)')}">${p.stock} units</span>
+              ${p.stock<15 ? `<button class="action-btn" style="background:var(--emerald-light);color:var(--emerald);margin-left:8px;padding:3px 8px;font-size:0.72rem" onclick="quickRestockProduct(${p.id}, 10)">+10 Stock</button>` : ''}
+            </td>
+            <td>
+              <button class="action-btn" style="background:var(--accent-light);color:var(--accent);margin-right:6px" onclick="editProduct(${p.id})">✏️ Edit</button>
+              <button class="action-btn" style="background:var(--rose-light);color:var(--rose)" onclick="deleteProduct(${p.id})">🗑 Delete</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
   } else if(tab==='orders'){
     const STATUS=['Confirmed','Shipped','Delivered','Cancelled'];
-    el.innerHTML=`<div class="table-wrap"><div class="table-head"><div class="table-head-title">All Orders (${DB.orders().length})</div></div>
-    <table class="data-table"><thead><tr><th>Order ID</th><th>Customer</th><th>Total</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
-    <tbody>${DB.orders().map(o=>{const u=DB.users().find(u=>u.id===o.userId);return`<tr><td><span style="font-family:var(--font-mono);font-weight:700">${o.id}</span></td><td>${u?.name||'Unknown'}</td><td style="font-weight:700">₹${o.total.toLocaleString()}</td><td><select onchange="updateOrderStatus('${o.id}',this.value)" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border);font-family:var(--font-body);font-size:.8rem;background:var(--bg-secondary);color:var(--text)">${STATUS.map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}</select></td><td style="color:var(--text-muted);font-size:.8rem">${new Date(o.date).toLocaleDateString('en-IN')}</td><td><button class="action-btn" style="background:var(--rose-light);color:var(--rose)" onclick="deleteOrder('${o.id}')">Delete</button></td></tr>`;}).join('')}</tbody></table></div>`;
+    let orders = DB.orders();
+    if(adminOrderFilter !== 'All') {
+      orders = orders.filter(o => o.status === adminOrderFilter);
+    }
+    if(adminOrderSearch) {
+      orders = orders.filter(o => 
+        o.id.toLowerCase().includes(adminOrderSearch) ||
+        (o.customerName && o.customerName.toLowerCase().includes(adminOrderSearch)) ||
+        (o.phone && o.phone.includes(adminOrderSearch))
+      );
+    }
+
+    el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:1rem;flex-wrap:wrap;background:var(--bg-secondary);padding:1rem;border-radius:var(--r-md);border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <label style="font-size:0.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase">Filter Status:</label>
+        <select onchange="handleAdminOrderFilter(this.value)" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text);font-weight:600;font-size:0.85rem">
+          <option value="All" ${adminOrderFilter==='All'?'selected':''}>All Orders (${DB.orders().length})</option>
+          ${STATUS.map(s=>`<option value="${s}" ${adminOrderFilter===s?'selected':''}>${s} (${DB.orders().filter(o=>o.status===s).length})</option>`).join('')}
+        </select>
+      </div>
+      <div style="flex:1;max-width:320px;display:flex;align-items:center;gap:8px;background:var(--bg-tertiary);padding:4px 12px;border-radius:8px;border:1px solid var(--border)">
+        <span style="font-size:0.85rem">🔍</span>
+        <input type="text" placeholder="Search by Order ID, Name, Phone..." value="${adminOrderSearch}" oninput="handleAdminOrderSearch(this.value)" style="background:transparent;border:none;outline:none;color:var(--text);font-size:0.85rem;width:100%">
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-head">
+        <div class="table-head-title">Customer Orders (${orders.length})</div>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Order ID</th>
+            <th>Customer & Contact</th>
+            <th>Items Ordered</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${orders.length ? orders.map(o => {
+            const u = DB.users().find(u => u.id === o.userId);
+            const custName = o.customerName || u?.name || 'Customer';
+            const itemsText = o.items.map(i => `${i.name} (x${i.qty})`).join(', ');
+            return `<tr>
+              <td><span style="font-family:var(--font-mono);font-weight:800;color:var(--accent)">${o.id}</span></td>
+              <td>
+                <div style="font-weight:700;color:var(--text)">${custName}</div>
+                <div style="font-size:0.78rem;color:var(--text-muted)">📞 ${o.phone || 'N/A'}</div>
+              </td>
+              <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${itemsText}">
+                <span style="font-size:0.82rem;color:var(--text-muted)">${itemsText}</span>
+              </td>
+              <td style="font-weight:800;color:var(--text)">₹${o.total.toLocaleString()}</td>
+              <td>
+                <select onchange="updateOrderStatus('${o.id}',this.value)" style="padding:4px 10px;border-radius:6px;border:1px solid var(--border);font-family:var(--font-body);font-size:.8rem;background:var(--bg-secondary);color:var(--text);font-weight:700">
+                  ${STATUS.map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}
+                </select>
+              </td>
+              <td style="color:var(--text-muted);font-size:.8rem">${new Date(o.date).toLocaleDateString('en-IN')}</td>
+              <td>
+                <button class="action-btn" style="background:var(--accent-light);color:var(--accent);margin-right:6px" onclick="viewOrderDetails('${o.id}')">👁 Details</button>
+                <button class="action-btn" style="background:var(--rose-light);color:var(--rose)" onclick="deleteOrder('${o.id}')">🗑</button>
+              </td>
+            </tr>`;
+          }).join('') : `<tr><td colspan="7" style="text-align:center;padding:2.5rem;color:var(--text-muted)">No matching orders found.</td></tr>`}
+        </tbody>
+      </table>
+    </div>`;
   } else if(tab==='users'){
-    el.innerHTML=`<div class="table-wrap"><div class="table-head"><div class="table-head-title">Users (${DB.users().length})</div></div>
-    <table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Action</th></tr></thead>
-    <tbody>${DB.users().map(u=>`<tr><td><strong>${u.name}</strong></td><td>${u.email}</td><td><span class="badge ${u.role==='admin'?'badge-red':'badge-blue'}">${u.role.toUpperCase()}</span></td><td><button class="action-btn" style="background:var(--amber-light);color:var(--amber)" onclick="toggleUserRole(${u.id})">${u.role==='admin'?'Make User':'Make Admin'}</button></td></tr>`).join('')}</tbody></table></div>`;
+    el.innerHTML=`<div class="table-wrap">
+      <div class="table-head">
+        <div class="table-head-title">Registered Accounts (${DB.users().length})</div>
+        <button class="action-btn" style="background:var(--accent);color:#fff;padding:8px 16px;font-weight:700" onclick="openUserModal()">+ Add User</button>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${DB.users().map(u=>`<tr>
+            <td><strong>${u.name}</strong></td>
+            <td>${u.email}</td>
+            <td><span class="badge ${u.role==='admin'?'badge-red':'badge-blue'}">${u.role.toUpperCase()}</span></td>
+            <td>
+              <button class="action-btn" style="background:var(--amber-light);color:var(--amber);margin-right:6px" onclick="toggleUserRole(${u.id})">${u.role==='admin'?'Make User':'Make Admin'}</button>
+              ${u.id !== currentUser.id ? `<button class="action-btn" style="background:var(--rose-light);color:var(--rose)" onclick="deleteUser(${u.id})">Delete</button>` : ''}
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
   }
 }
-function updateOrderStatus(id,status){const orders=DB.orders(),o=orders.find(o=>o.id===id);if(o)o.status=status;DB.save('orders',orders);showToast('Order '+id+' → '+status,'success');}
-function deleteOrder(id){DB.save('orders',DB.orders().filter(o=>o.id!==id));renderAdmin();showToast('Order deleted.','error');}
-function toggleUserRole(id){const users=DB.users(),u=users.find(u=>u.id===id);if(!u)return;u.role=u.role==='admin'?'user':'admin';DB.save('users',users);renderAdmin();showToast(u.name+' is now '+u.role,'info');}
+function updateOrderStatus(id,status){
+  const orders=DB.orders(),o=orders.find(o=>o.id===id);
+  if(o) o.status=status;
+  DB.save('orders',orders);
+  if(currentPage==='admin') renderAdmin();
+  if(currentPage==='orders') renderOrders();
+  showToast('Order '+id+' status updated → '+status,'success');
+}
+function deleteOrder(id){
+  DB.save('orders',DB.orders().filter(o=>o.id!==id));
+  if(currentPage==='admin') renderAdmin();
+  if(currentPage==='orders') renderOrders();
+  showToast('Order deleted.','error');
+}
+function toggleUserRole(id){
+  const users=DB.users(),u=users.find(u=>u.id===id);
+  if(!u)return;
+  u.role=u.role==='admin'?'user':'admin';
+  DB.save('users',users);
+  renderAdmin();
+  showToast(u.name+' role updated to '+u.role,'info');
+}
 function openProductModal(id){
   editProdId=id||null;
   document.getElementById('productModalTitle').textContent=id?'Edit Product':'Add Product';

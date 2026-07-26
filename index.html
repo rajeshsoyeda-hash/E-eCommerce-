@@ -189,6 +189,7 @@
     <div class="admin-tabs">
       <button class="admin-tab active" onclick="switchAdminTab('products',this)">Products</button>
       <button class="admin-tab" onclick="switchAdminTab('orders',this)">Orders</button>
+      <button class="admin-tab" onclick="switchAdminTab('users',this)">Users</button>
     </div>
     <div id="adminContent"></div>
   </div>
@@ -283,6 +284,16 @@
       <div class="form-group"><label class="form-label" for="pBadge">Badge</label><select class="form-select" id="pBadge" aria-label="Badge" title="Badge"><option value="">None</option><option>NEW</option><option>HOT</option><option>SALE</option><option>TOP</option></select></div>
     </div>
     <button class="modal-save" onclick="saveProduct()">Save Product</button>
+  </div>
+</div>
+<!-- ORDER DETAILS MODAL -->
+<div class="modal-overlay" id="orderDetailsModal" onclick="closeModalOutside(event,'orderDetailsModal')">
+  <div class="modal qv-modal">
+    <div class="modal-header">
+      <div class="modal-title" id="orderModalTitle">📋 Order Details</div>
+      <button class="modal-close" onclick="closeModal('orderDetailsModal')">✕</button>
+    </div>
+    <div id="orderDetailsContent"></div>
   </div>
 </div>
 <!-- USER MODAL -->
