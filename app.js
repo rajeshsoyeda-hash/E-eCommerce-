@@ -1,4 +1,4 @@
-let currentUser=null,currentPage='home',selCat='All',selProduct=null,detailQty=1,adminTab='products',editProdId=null,maxPrice=200000,sortBy='featured';
+let currentUser=null,currentPage='home',selCat='All',selProduct=null,detailQty=1,adminTab='orders',editProdId=null,maxPrice=200000,sortBy='featured';
 
 // AUTH
 function switchAuthTab(tab){
@@ -33,7 +33,16 @@ function startApp(user){
   document.getElementById('headerName').textContent=user.name.split(' ')[0];
   document.getElementById('headerAvatar').textContent=user.name.charAt(0).toUpperCase();
   const roleTag=document.getElementById('headerRole'),adminLink=document.getElementById('adminNavLink');
-  if(user.role==='admin'){roleTag.style.display='inline';adminLink.style.display='inline';}
+  if(user.role==='admin'){
+    roleTag.style.display='inline';
+    adminLink.style.display='inline';
+    const pendingReqs = DB.orders().filter(o => (o.status==='Pending' || o.orderStatus==='Pending')).length;
+    if (pendingReqs > 0) {
+      setTimeout(() => {
+        showToast(`🔔 Admin Alert: ${pendingReqs} new order request(s) waiting for your confirmation!`, 'info');
+      }, 800);
+    }
+  }
   else{roleTag.style.display='none';adminLink.style.display='none';}
   showPage('home');updateCartBadge();
   showToast('Welcome, '+user.name.split(' ')[0]+'! 🛍️','success');
@@ -905,26 +914,53 @@ function renderAdminTab(tab){
       </table>
     </div>`;
   } else if(tab==='orders'){
-    const STATUS=['Confirmed','Shipped','Out for Delivery','Delivered','Cancelled'];
+    const STATUS=['Pending','Confirmed','Shipped','Out for Delivery','Delivered','Cancelled'];
     let orders = DB.orders();
-    if(adminOrderFilter !== 'All') {
-      orders = orders.filter(o => o.status === adminOrderFilter);
-    }
-    if(adminOrderSearch) {
-      orders = orders.filter(o => 
-        o.id.toLowerCase().includes(adminOrderSearch) ||
-        (o.customerName && o.customerName.toLowerCase().includes(adminOrderSearch)) ||
-        (o.phone && o.phone.includes(adminOrderSearch))
-      );
+    if(adminOrderFilter === 'Active') {
+      orders = orders.filter(o => (o.status !== 'Delivered' && o.status !== 'Cancelled' && o.orderStatus !== 'Delivered' && o.orderStatus !== 'Cancelled'));
+    } else if(adminOrderFilter === 'History') {
+      orders = orders.filter(o => (o.status === 'Delivered' || o.status === 'Cancelled' || o.orderStatus === 'Delivered' || o.orderStatus === 'Cancelled'));
+    } else if(adminOrderFilter !== 'All') {
+      orders = orders.filter(o => (o.status === adminOrderFilter || o.orderStatus === adminOrderFilter));
     }
 
+    if(adminOrderSearch) {
+      orders = orders.filter(o => {
+        const oid = o.id || o.orderId || '';
+        return oid.toLowerCase().includes(adminOrderSearch) ||
+               (o.customerName && o.customerName.toLowerCase().includes(adminOrderSearch)) ||
+               (o.phone && o.phone.includes(adminOrderSearch));
+      });
+    }
+
+    const pendingOrders = DB.orders().filter(o => (o.status === 'Pending' || o.orderStatus === 'Pending'));
+    const activeCount = DB.orders().filter(o => (o.status !== 'Delivered' && o.status !== 'Cancelled')).length;
+    const historyCount = DB.orders().filter(o => (o.status === 'Delivered' || o.status === 'Cancelled')).length;
+
     el.innerHTML=`
+    ${pendingOrders.length > 0 ? `
+    <div style="background:linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(245, 158, 11, 0.15));border:1px solid var(--accent);padding:1.25rem;border-radius:var(--r-md);margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:2rem">🔔</div>
+        <div>
+          <div style="font-weight:900;font-size:1.05rem;color:var(--text)">Incoming Order Requests (${pendingOrders.length})</div>
+          <div style="font-size:0.85rem;color:var(--text-muted)">You have ${pendingOrders.length} customer order request(s) waiting for approval and processing.</div>
+        </div>
+      </div>
+      <button class="action-btn" style="background:var(--accent);color:#fff;padding:8px 18px;font-weight:800;font-size:0.88rem" onclick="handleAdminOrderFilter('Pending')">⚡ View Request Inbox (${pendingOrders.length})</button>
+    </div>` : ''}
+
     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:1rem;flex-wrap:wrap;background:var(--bg-secondary);padding:1rem;border-radius:var(--r-md);border:1px solid var(--border)">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <label style="font-size:0.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase">Filter Status:</label>
+        <button class="action-btn" style="background:${adminOrderFilter==='Active'||adminOrderFilter==='All'?'var(--accent)':'var(--bg-tertiary)'};color:${adminOrderFilter==='Active'||adminOrderFilter==='All'?'#fff':'var(--text)'};padding:6px 14px;font-weight:700" onclick="handleAdminOrderFilter('Active')">⚡ Active Requests (${activeCount})</button>
+        <button class="action-btn" style="background:${adminOrderFilter==='History'?'var(--emerald)':'var(--bg-tertiary)'};color:${adminOrderFilter==='History'?'#fff':'var(--text)'};padding:6px 14px;font-weight:700" onclick="handleAdminOrderFilter('History')">📦 Completed History (${historyCount})</button>
+
         <select onchange="handleAdminOrderFilter(this.value)" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text);font-weight:600;font-size:0.85rem">
           <option value="All" ${adminOrderFilter==='All'?'selected':''}>All Orders (${DB.orders().length})</option>
-          ${STATUS.map(s=>`<option value="${s}" ${adminOrderFilter===s?'selected':''}>${s} (${DB.orders().filter(o=>o.status===s).length})</option>`).join('')}
+          <option value="Pending" ${adminOrderFilter==='Pending'?'selected':''}>🔔 Pending Requests (${pendingOrders.length})</option>
+          <option value="Active" ${adminOrderFilter==='Active'?'selected':''}>⚡ Active Orders (${activeCount})</option>
+          <option value="History" ${adminOrderFilter==='History'?'selected':''}>📦 Order History (${historyCount})</option>
+          ${STATUS.map(s=>`<option value="${s}" ${adminOrderFilter===s?'selected':''}>${s} (${DB.orders().filter(o=>(o.status===s || o.orderStatus===s)).length})</option>`).join('')}
         </select>
         ${(adminOrderFilter !== 'All' || adminOrderSearch !== '') ? `<button class="action-btn" style="background:var(--rose-light);color:var(--rose);padding:6px 12px;font-weight:700" onclick="adminOrderFilter='All';adminOrderSearch='';renderAdmin()">✕ Clear Filters</button>` : ''}
       </div>
@@ -956,11 +992,17 @@ function renderAdminTab(tab){
         </thead>
         <tbody>
           ${orders.length ? orders.map(o => {
+            const oid = o.id || o.orderId || 'ORD-000';
+            const currentStatus = o.status || o.orderStatus || 'Pending';
             const u = DB.users().find(u => u.id === o.userId);
             const custName = o.customerName || u?.name || 'Customer';
-            const itemsText = o.items.map(i => `${i.name} (x${i.qty})`).join(', ');
+            const rawItems = o.items || o.orderItems || [];
+            const itemsText = rawItems.map(i => `${i.name} (x${i.qty || i.quantity || 1})`).join(', ') || 'Item';
+            const orderTotal = o.total !== undefined ? o.total : (o.totalAmount || 0);
+            const orderDate = o.date || o.createdAt || Date.now();
+
             return `<tr>
-              <td><span style="font-family:var(--font-mono);font-weight:800;color:var(--accent)">${o.id}</span></td>
+              <td><span style="font-family:var(--font-mono);font-weight:800;color:var(--accent)">${oid}</span></td>
               <td>
                 <div style="font-weight:700;color:var(--text)">${custName}</div>
                 <div style="font-size:0.78rem;color:var(--text-muted)">📞 ${o.phone || 'N/A'}</div>
@@ -968,18 +1010,19 @@ function renderAdminTab(tab){
               <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${itemsText}">
                 <span style="font-size:0.82rem;color:var(--text-muted)">${itemsText}</span>
               </td>
-              <td style="font-weight:800;color:var(--text)">₹${o.total.toLocaleString()}</td>
+              <td style="font-weight:800;color:var(--text)">₹${orderTotal.toLocaleString()}</td>
               <td>
-                <select onchange="updateOrderStatus('${o.id}',this.value)" style="padding:4px 10px;border-radius:6px;border:1px solid var(--border);font-family:var(--font-body);font-size:.8rem;background:var(--bg-secondary);color:var(--text);font-weight:700">
-                  ${STATUS.map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}
+                <select onchange="updateOrderStatus('${oid}',this.value)" style="padding:4px 10px;border-radius:6px;border:1px solid var(--border);font-family:var(--font-body);font-size:.8rem;background:var(--bg-secondary);color:var(--text);font-weight:700">
+                  ${STATUS.map(s=>`<option ${s===currentStatus?'selected':''}>${s}</option>`).join('')}
                 </select>
               </td>
-              <td style="color:var(--text-muted);font-size:.8rem">${new Date(o.date).toLocaleDateString('en-IN')}</td>
+              <td style="color:var(--text-muted);font-size:.8rem">${new Date(orderDate).toLocaleDateString('en-IN')}</td>
               <td>
-                <button class="action-btn" style="background:var(--accent-light);color:var(--accent);margin-right:4px" onclick="viewOrderDetails('${o.id}')">👁 Details</button>
-                ${o.status === 'Confirmed' ? `<button class="action-btn" style="background:var(--amber-light);color:var(--amber);margin-right:4px;font-weight:700" onclick="updateOrderStatus('${o.id}','Out for Delivery')">🚚 Out for Delivery</button>` : ''}
-                ${o.status === 'Out for Delivery' || o.status === 'Shipped' ? `<button class="action-btn" style="background:var(--emerald-light);color:var(--emerald);margin-right:4px;font-weight:700" onclick="updateOrderStatus('${o.id}','Delivered')">✅ Mark Delivered</button>` : ''}
-                <button class="action-btn" style="background:var(--rose-light);color:var(--rose)" onclick="deleteOrder('${o.id}')">🗑</button>
+                <button class="action-btn" style="background:var(--accent-light);color:var(--accent);margin-right:4px" onclick="viewOrderDetails('${oid}')">👁 Details</button>
+                ${currentStatus === 'Pending' ? `<button class="action-btn" style="background:var(--accent-light);color:var(--accent);margin-right:4px;font-weight:700" onclick="updateOrderStatus('${oid}','Confirmed')">✓ Confirm Order</button>` : ''}
+                ${currentStatus === 'Confirmed' ? `<button class="action-btn" style="background:var(--amber-light);color:var(--amber);margin-right:4px;font-weight:700" onclick="updateOrderStatus('${oid}','Out for Delivery')">🚚 Out for Delivery</button>` : ''}
+                ${currentStatus === 'Out for Delivery' || currentStatus === 'Shipped' ? `<button class="action-btn" style="background:var(--emerald-light);color:var(--emerald);margin-right:4px;font-weight:700" onclick="updateOrderStatus('${oid}','Delivered')">✅ Mark Delivered</button>` : ''}
+                <button class="action-btn" style="background:var(--rose-light);color:var(--rose)" onclick="deleteOrder('${oid}')">🗑</button>
               </td>
             </tr>`;
           }).join('') : `<tr><td colspan="7" style="text-align:center;padding:2.5rem;color:var(--text-muted)">No matching orders found.</td></tr>`}

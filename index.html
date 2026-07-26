@@ -183,15 +183,15 @@
   <div class="page" id="page-admin">
     <div class="section-header"><div class="section-title">🛡 Admin Dashboard</div><span class="badge badge-red">Admin Only</span></div>
     <div class="admin-grid">
-      <div class="admin-stat"><div class="admin-stat-icon">📦</div><div class="admin-stat-num" id="adminProducts">0</div><div class="admin-stat-label">Products</div></div>
-      <div class="admin-stat"><div class="admin-stat-icon">📋</div><div class="admin-stat-num" id="adminOrders">0</div><div class="admin-stat-label">Orders</div></div>
-      <div class="admin-stat"><div class="admin-stat-icon">👥</div><div class="admin-stat-num" id="adminUsers">0</div><div class="admin-stat-label">Users</div></div>
-      <div class="admin-stat"><div class="admin-stat-icon">💰</div><div class="admin-stat-num" id="adminRevenue">₹0</div><div class="admin-stat-label">Revenue</div></div>
+      <div class="admin-stat" onclick="switchAdminTab('orders')"><div class="admin-stat-icon">📋</div><div class="admin-stat-num" id="adminOrders">0</div><div class="admin-stat-label">Orders (Click to view)</div></div>
+      <div class="admin-stat" onclick="switchAdminTab('products')"><div class="admin-stat-icon">📦</div><div class="admin-stat-num" id="adminProducts">0</div><div class="admin-stat-label">Products Inventory</div></div>
+      <div class="admin-stat" onclick="switchAdminTab('users')"><div class="admin-stat-icon">👥</div><div class="admin-stat-num" id="adminUsers">0</div><div class="admin-stat-label">Registered Users</div></div>
+      <div class="admin-stat"><div class="admin-stat-icon">💰</div><div class="admin-stat-num" id="adminRevenue">₹0</div><div class="admin-stat-label">Total Revenue</div></div>
     </div>
     <div class="admin-tabs">
-      <button class="admin-tab active" onclick="switchAdminTab('products',this)">Products</button>
-      <button class="admin-tab" onclick="switchAdminTab('orders',this)">Orders</button>
-      <button class="admin-tab" onclick="switchAdminTab('users',this)">Users</button>
+      <button class="admin-tab active" id="tab-btn-orders" onclick="switchAdminTab('orders',this)">📋 Orders & History</button>
+      <button class="admin-tab" id="tab-btn-products" onclick="switchAdminTab('products',this)">📦 Products</button>
+      <button class="admin-tab" id="tab-btn-users" onclick="switchAdminTab('users',this)">👥 Users</button>
     </div>
     <div id="adminContent"></div>
   </div>
